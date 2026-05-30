@@ -41,6 +41,7 @@ import { Card } from '@/components/ui/card';
 import { TierBadge } from '@/components/ui/tier-badge';
 import { VerificationGuard } from '@/components/VerificationGuard';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface Debt {
   id: string;
@@ -122,6 +123,7 @@ const getSmartTranslatedText = (text: string | null | undefined, t: any): string
 
 export default function Transactions() {
   const { user, profile, t } = useAuth();
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'marketplace' | 'history'>('marketplace');
   const [feeRate, setFeeRate] = useState<number>(0.01);
@@ -443,6 +445,7 @@ export default function Transactions() {
   });
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
   const [isIdWarningOpen, setIsIdWarningOpen] = useState(false);
+  const [isCreditDeductOpen, setIsCreditDeductOpen] = useState(false);
 
   const handlePhotoCapture = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1629,6 +1632,10 @@ export default function Transactions() {
                         return;
                       }
                     }
+                    if (txStep === 3) {
+                      setIsCreditDeductOpen(true);
+                      return;
+                    }
                     txStep < 3 ? setTxStep(prev => prev + 1) : handleCreateTransaction();
                   }}
                   disabled={(txStep === 1 && (!amount || isCreditInsufficient)) || txStep === 3 && (!lenderSignature || !borrowerSignature) || isSubmitting || isUploadingPhotos}
@@ -1662,6 +1669,106 @@ export default function Transactions() {
           >
             {t('confirm') || '확인'}
           </Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Credit Deduction Consent & Reminder Modal */}
+      <Dialog open={isCreditDeductOpen} onOpenChange={setIsCreditDeductOpen}>
+        <DialogContent className="max-w-md w-[95%] rounded-[32px] dark:bg-slate-950 dark:border-white/5 p-6 outline-none flex flex-col space-y-5">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black dark:text-white text-center">
+              {t('credit_deduction_title') || '거래 체결 및 크레딧 차감 동의'}
+            </DialogTitle>
+          </DialogHeader>
+
+          {(() => {
+            const transactionFee = parseFloat(amount || '0') * feeRate;
+            const currentCredit = profile?.credit ? parseFloat(profile.credit.toString()) : 0;
+            const isCreditInsufficient = currentCredit <= 0 || currentCredit < transactionFee;
+            const remainingCredit = currentCredit - transactionFee;
+
+            return (
+              <div className="space-y-5 text-sm font-bold">
+                <div className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5 space-y-2.5">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">거래 신청 금액:</span>
+                    <span className="text-slate-800 dark:text-slate-200">PHP {parseFloat(amount || '0').toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">플랫폼 수수료:</span>
+                    <span className="text-rose-600 dark:text-rose-400 font-extrabold">PHP {transactionFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="border-t border-dashed border-slate-200 dark:border-white/5 my-2 pt-2" />
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">현재 보유 크레딧:</span>
+                    <span className="text-slate-800 dark:text-slate-200">PHP {currentCredit.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">차감 후 잔액:</span>
+                    <span className={`font-extrabold ${remainingCredit < 0 ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                      PHP {remainingCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+
+                {isCreditInsufficient ? (
+                  <div className="space-y-4">
+                    <p className="text-xs text-rose-500 bg-rose-500/5 p-4 rounded-2xl border border-rose-500/10 leading-relaxed font-bold text-center">
+                      보유하신 크레딧 잔액이 거래 수수료보다 부족하여 거래를 진행할 수 없습니다. 안전한 거래 체결을 위해 크레딧을 먼저 충전해 주세요.
+                    </p>
+                    <div className="flex gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsCreditDeductOpen(false)}
+                        className="flex-1 h-12 rounded-xl border-slate-200 dark:border-white/10 text-xs active:scale-95 transition-transform"
+                      >
+                        닫기
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setIsCreditDeductOpen(false);
+                          router.push('/deposit');
+                        }}
+                        className="flex-1 h-12 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs shadow-md shadow-rose-500/25 active:scale-95 transition-all text-center flex items-center justify-center"
+                      >
+                        크레딧 충전하기
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 bg-blue-500/5 p-4 rounded-2xl border border-blue-500/10 leading-relaxed font-bold text-center">
+                      외상 거래 완료 시 플랫폼 중개 수수료가 보유 크레딧에서 즉시 차감되며, 이는 법적으로 취소할 수 없습니다. 이에 동의하고 거래를 최종 체결하시겠습니까?
+                    </p>
+                    <div className="flex gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsCreditDeductOpen(false)}
+                        disabled={isSubmitting}
+                        className="flex-1 h-12 rounded-xl border-slate-200 dark:border-white/10 text-xs active:scale-95 transition-transform"
+                      >
+                        취소
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setIsCreditDeductOpen(false);
+                          handleCreateTransaction();
+                        }}
+                        disabled={isSubmitting}
+                        className="flex-1 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs shadow-md shadow-blue-500/25 active:scale-95 transition-all flex items-center justify-center"
+                      >
+                        동의 및 거래 완료
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
