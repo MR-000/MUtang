@@ -61,7 +61,8 @@ export default function SellProductPage() {
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
+      // 1. 판매 로그 기록
+      const { error: logError } = await supabase
         .from('inventory_logs')
         .insert([{
           user_id: user?.id,
@@ -71,7 +72,17 @@ export default function SellProductPage() {
           price: product.price
         }]);
 
-      if (error) throw error;
+      if (logError) throw logError;
+
+      // 2. inventory 테이블 재고 차감
+      const newStock = Math.max(0, (product.stock ?? 0) - quantity);
+      const { error: stockError } = await supabase
+        .from('inventory')
+        .update({ stock: newStock })
+        .eq('sku', product.sku)
+        .eq('user_id', user?.id);
+
+      if (stockError) throw stockError;
 
       toast.success(t('sale_success'));
       setBarcode('');
