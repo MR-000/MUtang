@@ -13,55 +13,63 @@ interface BarcodeScannerProps {
 export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string>('');
+  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('utang-event-scanner-mount'));
-    let codeReader: BrowserMultiFormatReader | null = new BrowserMultiFormatReader();
     
-    codeReader.listVideoInputDevices()
-      .then((videoInputDevices) => {
+    // 싱글톤 브라우저 스캐너 생성 및 보관
+    const codeReader = new BrowserMultiFormatReader();
+    codeReaderRef.current = codeReader;
+    
+    const startScanner = async () => {
+      try {
+        const videoInputDevices = await codeReader.listVideoInputDevices();
         if (videoInputDevices.length === 0) {
           setError("카메라 기기를 찾을 수 없습니다.");
           return;
         }
 
-        // Try to find a back camera
+        // 후면 카메라 우선 선택 로직
         let selectedDeviceId = videoInputDevices[0].deviceId;
         for (const device of videoInputDevices) {
-          if (device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('environment')) {
+          const label = device.label.toLowerCase();
+          if (label.includes('back') || label.includes('environment') || label.includes('rear') || label.includes('후면')) {
             selectedDeviceId = device.deviceId;
             break;
           }
         }
 
         if (videoRef.current) {
-          codeReader.decodeFromVideoDevice(selectedDeviceId, videoRef.current, (result, err) => {
+          // zxing 라이브러리를 통해 카메라 스트림을 안전하게 decode 하도록 연결
+          await codeReader.decodeFromVideoDevice(selectedDeviceId, videoRef.current, (result, err) => {
             if (result) {
               onScan(result.getText());
-              // Auto-stop scanning after finding one
-              if (codeReader) {
-                codeReader.reset();
-              }
+              // 한 번 스캔 성공 시 안전하게 정리하고 스캐너 종료
+              codeReader.reset();
+              onClose();
             }
             if (err && !(err instanceof NotFoundException)) {
               console.error(err);
             }
           });
         }
-      })
-      .catch((err) => {
-        setError("카메라 권한을 허용해주세요.");
-        console.error(err);
-      });
+      } catch (err: any) {
+        console.error("Camera init error:", err);
+        setError("카메라 접근 권한이 없거나, 다른 앱에서 카메라를 사용 중입니다. 권한을 허용해 주세요.");
+      }
+    };
+
+    startScanner();
 
     return () => {
       window.dispatchEvent(new CustomEvent('utang-event-scanner-unmount'));
-      if (codeReader) {
-        codeReader.reset();
-        codeReader = null;
+      if (codeReaderRef.current) {
+        codeReaderRef.current.reset();
+        codeReaderRef.current = null;
       }
     };
-  }, [onScan]);
+  }, [onScan, onClose]);
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
@@ -77,7 +85,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
 
       <div className="relative flex-1 flex items-center justify-center overflow-hidden">
         {error ? (
-          <div className="text-red-500 font-bold p-6 bg-white/10 rounded-2xl text-center backdrop-blur-md">
+          <div className="text-red-500 font-bold p-6 bg-white/10 rounded-2xl text-center backdrop-blur-md max-w-xs mx-auto leading-relaxed text-xs">
             {error}
           </div>
         ) : (
