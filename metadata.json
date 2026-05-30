@@ -1,0 +1,6 @@
+{
+  "name": "MUtang",
+  "description": "Debt management for Sari-sari stores with simple GCash payments.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
