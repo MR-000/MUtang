@@ -26,6 +26,7 @@ export default function StockListPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editSku, setEditSku] = useState('');
   const [editName, setEditName] = useState('');
   const [editPrice, setEditPrice] = useState('');
   const [editStock, setEditStock] = useState('');
@@ -52,6 +53,7 @@ export default function StockListPage() {
 
   const startEdit = (item: InventoryItem) => {
     setEditingId(item.id);
+    setEditSku(item.sku);
     setEditName(item.name);
     setEditPrice(String(item.price));
     setEditStock(String(item.stock));
@@ -62,12 +64,28 @@ export default function StockListPage() {
   };
 
   const saveEdit = async (id: string) => {
-    if (!editName || !editPrice) return;
+    if (!editSku || !editName || !editPrice) return;
     setSaving(true);
     try {
+      // 바코드 중복 체크 (자기 자신 제외)
+      const { data: existing } = await supabase
+        .from('inventory')
+        .select('id')
+        .eq('user_id', user?.id)
+        .eq('sku', editSku)
+        .neq('id', id)
+        .maybeSingle();
+
+      if (existing) {
+        toast.error(t('duplicate_barcode_edit'));
+        setSaving(false);
+        return;
+      }
+
       const { error } = await supabase
         .from('inventory')
         .update({
+          sku: editSku,
           name: editName,
           price: parseFloat(editPrice),
           stock: parseInt(editStock) || 0
@@ -138,6 +156,15 @@ export default function StockListPage() {
               {editingId === item.id ? (
                 <div className="space-y-3">
                   <div className="text-xs font-black text-slate-400 uppercase tracking-widest">{t('edit_stock')}</div>
+                  <div className="space-y-1">
+                    <div className="text-xs text-slate-400 font-bold px-1">{t('edit_barcode')}</div>
+                    <Input
+                      value={editSku}
+                      onChange={(e) => setEditSku(e.target.value)}
+                      placeholder={t('barcode_number')}
+                      className="h-12 rounded-xl bg-slate-50 dark:bg-white/5 border-none font-bold font-mono text-slate-600 dark:text-slate-300"
+                    />
+                  </div>
                   <Input
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}

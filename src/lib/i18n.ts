@@ -256,6 +256,8 @@ export const translations: Dictionary = {
   save_changes: { en: "Save Changes", tl: "I-save ang mga Pagbabago", ko: "변경 사항 저장", zh: "保存更改", ja: "変更を保存" },
   stock_updated: { en: "Stock updated successfully.", tl: "Matagumpay na na-update ang stock.", ko: "재고가 수정되었습니다.", zh: "库存更新成功。", ja: "在庫が更新されました。" },
   no_stock_data: { en: "No products registered yet.", tl: "Wala pang produktong nairehistro.", ko: "등록된 상품이 없습니다.", zh: "暂无注册产品。", ja: "登録された商品はありません。" },
-  quantity: { en: "Quantity", tl: "Dami", ko: "수량", zh: "数量", ja: "数量" }
+  quantity: { en: "Quantity", tl: "Dami", ko: "수량", zh: "数量", ja: "数量" },
+  edit_barcode: { en: "Barcode (SKU)", tl: "Barcode (SKU)", ko: "바코드 (SKU)", zh: "条码 (SKU)", ja: "バーコード (SKU)" },
+  duplicate_barcode_edit: { en: "This barcode is already used by another product.", tl: "Ginagamit na ng ibang produkto ang barcode na ito.", ko: "이미 다른 상품에 등록된 바코드입니다.", zh: "此条码已被其他产品使用。", ja: "このバーコードはすでに別の商品に登録されています。" }
 };
 export const getTranslation = (key: string, lang: Language) => { return translations[key]?.[lang] || translations[key]?.['en'] || key; };
