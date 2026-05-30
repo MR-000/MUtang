@@ -143,14 +143,14 @@ export default function SettingsPage() {
       if (notifStatus === 'granted') {
         await unsubscribePush(user.id);
         setNotifStatus('default');
-        toast.success('알림이 해제됐습니다.');
+        toast.success(t('notification_disabled_toast'));
       } else {
         const success = await initPushNotifications(user.id);
         if (success) {
           setNotifStatus('granted');
-          toast.success('알림이 활성화됐습니다!');
+          toast.success(t('notification_enabled_toast'));
         } else {
-          toast.error('알림 권한을 허용해 주세요.');
+          toast.error(t('notification_allow_hint_toast'));
         }
       }
     } catch (e: any) {
@@ -252,9 +252,9 @@ export default function SettingsPage() {
               {notifStatus === 'granted' ? <Bell className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
             </div>
             <div>
-              <p className="font-bold text-slate-900 dark:text-white text-sm">만기일 알림</p>
+              <p className="font-bold text-slate-900 dark:text-white text-sm">{t('due_date_alert')}</p>
               <p className="text-xs text-slate-500">
-                {notifStatus === 'granted' ? '알림 활성화됨 (D-1, D-2)' : notifStatus === 'denied' ? '브라우저에서 차단됨' : '비활성화'}
+                {notifStatus === 'granted' ? t('alert_enabled') : notifStatus === 'denied' ? t('blocked_by_browser') : t('disabled')}
               </p>
             </div>
           </div>
@@ -271,7 +271,7 @@ export default function SettingsPage() {
           </button>
         </div>
         {notifStatus === 'denied' && (
-          <p className="text-xs text-red-500 mt-3 px-1">브라우저 설정에서 알림 권한을 허용해 주세요.</p>
+          <p className="text-xs text-red-500 mt-3 px-1">{t('please_allow_browser_notification')}</p>
         )}
       </Card>
 
@@ -390,7 +390,7 @@ export default function SettingsPage() {
                 value={profile.solana_wallet || ''}
                 onChange={(e) => setProfile({...profile, solana_wallet: e.target.value})}
                 className="pl-10 font-mono text-xs"
-                placeholder="솔라나 지갑 주소 (USDT/USDC 수금용)"
+                placeholder={t('solana_address_placeholder')}
               />
             </div>
           </div>

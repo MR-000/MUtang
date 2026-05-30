@@ -184,6 +184,15 @@ export const translations: Dictionary = {
   select_coin_type: { en: 'Select Coin Type', tl: 'Pumili ng Coin Type', ko: '코인 종류 선택', zh: '选择代币类型', ja: 'コインタイプ選択' },
   lender_name: { en: 'Lender Name', tl: 'Pangalan ng Nagpapautang', ko: '채권자 이름', zh: '贷方姓名', ja: '貸主名' },
   lender_wallet_address: { en: 'Lender Wallet Address', tl: 'Wallet Address ng Nagpapautang', ko: '입금할 채권자 지갑 주소', zh: '贷方钱包地址', ja: '貸主のウォレットアドレス' },
-  camera_access_denied: { en: 'No camera access or camera is in use by another app. Please grant permission.', tl: 'Walang access sa camera o ginagamit ng ibang app. Paki-payagan ang permission.', ko: '카메라 접근 권한이 없거나, 다른 앱에서 카메라를 사용 중입니다. 권한을 허용해 주세요.', zh: '没有相机访问权限或相机正被其他应用使用。请授予权限。', ja: 'カメラへのアクセス権限がないか、別のアプリでカメラが使用中です。権限を許可してください。' }
+  camera_access_denied: { en: 'No camera access or camera is in use by another app. Please grant permission.', tl: 'Walang access sa camera o ginagamit ng ibang app. Paki-payagan ang permission.', ko: '카메라 접근 권한이 없거나, 다른 앱에서 카메라를 사용 중입니다. 권한을 허용해 주세요.', zh: '没有相机访问权限或相机正被其他应用使用。请授予权限。', ja: 'カメラへのアクセス権限がないか、別のアプリでカメラが使用中です。権限を許可してください。' },
+  due_date_alert: { en: 'Due Date Alert', tl: 'Paalala sa Takdang Petsa', ko: '만기일 알림', zh: '截止日期提醒', ja: '期日アラート' },
+  alert_enabled: { en: 'Alert Enabled (D-1, D-2)', tl: 'Naka-enable na Alert (D-1, D-2)', ko: '알림 활성화됨 (D-1, D-2)', zh: '提醒已启用 (D-1, D-2)', ja: 'アラート有効化 (D-1, D-2)' },
+  blocked_by_browser: { en: 'Blocked by Browser', tl: 'Blocked sa Browser', ko: '브라우저에서 차단됨', zh: '浏览器已拦截', ja: 'ブラウザでブロックされました' },
+  disabled: { en: 'Disabled', tl: 'Naka-disable', ko: '비활성화', zh: '已禁用', ja: '無効' },
+  please_allow_browser_notification: { en: 'Please allow notification permission in browser settings.', tl: 'Pakisagutan ang notification permission sa settings ng browser.', ko: '브라우저 설정에서 알림 권한을 허용해 주세요.', zh: '请在浏览器设置中允许通知权限。', ja: 'ブラウザの設定で通知権限を許可してください。' },
+  notification_disabled_toast: { en: 'Notifications disabled.', tl: 'Naka-disable na ang alerts.', ko: '알림이 해제됐습니다.', zh: '通知已关闭。', ja: '通知が解除されました。' },
+  notification_enabled_toast: { en: 'Notifications enabled!', tl: 'Naka-enable na ang alerts!', ko: '알림이 활성화됐습니다!', zh: '通知已开启！', ja: '通知が有効化されました！' },
+  notification_allow_hint_toast: { en: 'Please allow notification permission.', tl: 'Paki-allow ang notification permission.', ko: '알림 권한을 허용해 주세요.', zh: '请允许通知权限。', ja: '通知権限を許可してください。' },
+  solana_address_placeholder: { en: 'Solana wallet address (USDT/USDC receiver)', tl: 'Solana wallet address (para sa USDT/USDC)', ko: '솔라나 지갑 주소 (USDT/USDC 수금용)', zh: 'Solana 钱包地址 (用于 USDT/USDC 收款)', ja: 'ソラナウォレットアドレス（USDT/USDC受信用）' }
 };
 export const getTranslation = (key: string, lang: Language) => { return translations[key]?.[lang] || translations[key]?.['en'] || key; };
