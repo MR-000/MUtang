@@ -158,6 +158,10 @@ export const translations: Dictionary = {
   view_proof: { en: 'View Receipt', tl: 'Tingnan ang Resibo', ko: '입금증 보기', zh: '보기', ja: '証明書を表示' },
   select_image_btn: { en: 'Select Screenshot', tl: 'Pumili ng Screenshot', ko: '영수증 스크린샷 선택하기', zh: '선택', ja: '領収書スクリーンショットを選択' },
   upload_submit_btn: { en: 'Upload and Submit Receipt', tl: 'I-upload at Ipadala ang Resibo', ko: '입금증 업로드 및 제출', zh: '제출', ja: '証明書をアップロードして提出' },
-  cancel_select: { en: 'Cancel Selection', tl: 'I-cancel ang Pagpili', ko: '선택 취소', zh: '취소', ja: '選択をキャンセル' }
+  cancel_select: { en: 'Cancel Selection', tl: 'I-cancel ang Pagpili', ko: '선택 취소', zh: '취소', ja: '選択をキャンセル' },
+  scan_barcode: { en: 'Scan Barcode', tl: 'I-scan ang Barcode', ko: '바코드 스캔', zh: '扫描条形码', ja: 'バーコードスキャン' },
+  align_barcode_hint: { en: 'Align barcode inside the frame (Bring it closer to scan)', tl: 'I-align ang barcode sa frame (ilapit para ma-scan)', ko: '바코드를 사각형 프레임 안에 맞춰주세요 (인식이 안 될 시 더 가까이 대어주세요)', zh: '对齐框架内的条形码（移近以扫描）', ja: 'バーコードをフレーム内に合わせてください（スキャンするには近づけてください）' },
+  camera_not_found: { en: 'Camera device not found.', tl: 'Hindi mahanap ang camera.', ko: '카메라 기기를 찾을 수 없습니다.', zh: '未找到相机设备。', ja: 'カメラデバイスが見つかりません。' },
+  camera_access_denied: { en: 'No camera access or camera is in use by another app. Please grant permission.', tl: 'Walang access sa camera o ginagamit ng ibang app. Paki-payagan ang permission.', ko: '카메라 접근 권한이 없거나, 다른 앱에서 카메라를 사용 중입니다. 권한을 허용해 주세요.', zh: '没有相机访问权限或相机正被其他应用使用。请授予权限。', ja: 'カメラへのアクセス権限がないか、別のアプリでカメラが使用中です。権限を許可してください。' }
 };
 export const getTranslation = (key: string, lang: Language) => { return translations[key]?.[lang] || translations[key]?.['en'] || key; };

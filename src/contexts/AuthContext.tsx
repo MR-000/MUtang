@@ -51,7 +51,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     initDebugTools();
     const savedLang = localStorage.getItem('utang_lang') as Language;
     const savedTheme = localStorage.getItem('utang_theme') as Theme;
-    if (savedLang) setLanguageState(savedLang);
+    if (savedLang) {
+      setLanguageState(savedLang);
+    } else {
+      setLanguageState('en');
+      localStorage.setItem('utang_lang', 'en');
+    }
     if (savedTheme) setThemeState(savedTheme);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
