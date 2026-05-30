@@ -1409,7 +1409,7 @@ export default function Transactions() {
 
                 <div className="space-y-6">
                   <div className="space-y-3">
-                    <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('amount')} (원)</Label>
+                    <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('amount_php')}</Label>
                     <Input 
                       type="number"
                       value={amount}
@@ -1420,7 +1420,7 @@ export default function Transactions() {
                   </div>
                   
                   <div className="space-y-3">
-                    <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">이자율(%)</Label>
+                    <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('interest_rate_percent')}</Label>
                     <Input 
                       type="number"
                       value={interestRate}
@@ -1431,9 +1431,9 @@ export default function Transactions() {
                   </div>
 
                   <div className="space-y-3">
-                    <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">만기 시 상환 금액</Label>
+                    <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('repayment_amount_due')}</Label>
                     <div className="h-20 flex flex-col justify-center px-5 rounded-2xl bg-blue-500/10 dark:bg-blue-600/20 border border-blue-500/25">
-                      <span className="text-[10px] font-black uppercase tracking-[0.1em] text-blue-600 dark:text-blue-400 mb-0.5">총 상환 금액 (원금 + 이자)</span>
+                      <span className="text-[10px] font-black uppercase tracking-[0.1em] text-blue-600 dark:text-blue-400 mb-0.5">{t('total_repay_amount_desc')}</span>
                       <span className="text-2xl font-black text-blue-700 dark:text-blue-300">
                         { (Number(amount || 0) * (1 + Number(interestRate || 0) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
                       </span>
@@ -1441,7 +1441,7 @@ export default function Transactions() {
                   </div>
 
                   <div className="space-y-3">
-                    <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">기한 후 미납 시 규정 (연체약정)</Label>
+                    <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('overdue_policy_label')}</Label>
                     <Select value={policyType} onValueChange={(value) => {
                       setPolicyType(value);
                       if (value !== 'custom') {
@@ -1456,13 +1456,13 @@ export default function Transactions() {
                       }
                     }}>
                       <SelectTrigger className="h-16 rounded-2xl bg-slate-50 dark:bg-white/5 border-none font-bold focus:ring-2 focus:ring-blue-500">
-                        <SelectValue placeholder="미납 시 규정을 선택하세요" />
+                        <SelectValue placeholder={t('overdue_policy_placeholder')} />
                       </SelectTrigger>
                       <SelectContent className="rounded-2xl dark:bg-slate-900 border-none shadow-xl">
-                        <SelectItem value="1" className="font-bold">연체 시 매일 1% 연체료 부과</SelectItem>
-                        <SelectItem value="2" className="font-bold">연체 시 연 5% 지연이자율 적용</SelectItem>
-                        <SelectItem value="3" className="font-bold">연체 시 연 24% 법정 지연손해금 적용</SelectItem>
-                        <SelectItem value="custom" className="font-bold">직접 입력</SelectItem>
+                        <SelectItem value="1" className="font-bold">{t('overdue_policy_4')}</SelectItem>
+                        <SelectItem value="2" className="font-bold">{t('overdue_policy_5')}</SelectItem>
+                        <SelectItem value="3" className="font-bold">{t('overdue_policy_6')}</SelectItem>
+                        <SelectItem value="custom" className="font-bold">{t('custom')}</SelectItem>
                       </SelectContent>
                     </Select>
                     {policyType === 'custom' && (
@@ -1472,7 +1472,7 @@ export default function Transactions() {
                           setCustomPolicy(e.target.value);
                           setOverduePolicy(e.target.value);
                         }}
-                        placeholder="지연 시 부과할 규정이나 내용을 직접 입력하세요."
+                        placeholder={t('custom_policy_placeholder')}
                         className="h-14 mt-2 rounded-2xl bg-slate-50 dark:bg-white/5 border-none font-bold focus:ring-2 focus:ring-blue-500 animate-in fade-in duration-300"
                       />
                     )}
@@ -1514,25 +1514,23 @@ export default function Transactions() {
                           : 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400'
                       } space-y-2 animate-in slide-in-from-top-2 duration-300`}>
                         <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider">
-                          <span>상호 거래 플랫폼 수수료 (양측 각각 {(feeRate * 100).toFixed(1)}%)</span>
+                          <span>{t('platform_fee_label')}</span>
                           <span>PHP {transactionFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex items-center justify-between text-[11px] font-bold opacity-80 border-t border-current/10 pt-2">
-                          <span>보유 및 사용 가능 크레딧</span>
+                          <span>{t('available_recharge_credit')}</span>
                           <span>PHP {currentCredit.toLocaleString()}</span>
                         </div>
                         {isInsufficient && (
                           <div className="space-y-3 mt-2">
                             <div className="text-[10px] font-extrabold text-rose-500 bg-rose-500/5 p-3 rounded-xl border border-rose-500/10 leading-relaxed">
-                              {isZeroCredit 
-                                ? '보유하신 크레딧이 없습니다. 안전한 거래 진행을 위해 사용 크레딧 충전이 필요합니다.' 
-                                : '보유하신 크레딧이 거래 수수료보다 부족하여 상호거래를 체결할 수 없습니다. 충전이 필요합니다.'}
+                              {isZeroCredit ? t('no_credit_msg') : t('credit_insufficient_msg')}
                             </div>
                             <Link 
                               href="/deposit"
                               className="flex items-center justify-center gap-2 w-full py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-[16px] font-black text-xs shadow-md shadow-rose-500/25 active:scale-95 transition-all text-center"
                             >
-                              <span>크레딧 충전하러 가기</span>
+                              <span>{t('recharge_credit_go')}</span>
                               <ChevronRight className="w-3.5 h-3.5" />
                             </Link>
                           </div>
@@ -1691,20 +1689,20 @@ export default function Transactions() {
               <div className="space-y-5 text-sm font-bold">
                 <div className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5 space-y-2.5">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-400">거래 신청 금액:</span>
+                    <span className="text-slate-400">{t('amount_php')}:</span>
                     <span className="text-slate-800 dark:text-slate-200">PHP {parseFloat(amount || '0').toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-400">플랫폼 수수료:</span>
+                    <span className="text-slate-400">{t('platform_fee_label')}:</span>
                     <span className="text-rose-600 dark:text-rose-400 font-extrabold">PHP {transactionFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="border-t border-dashed border-slate-200 dark:border-white/5 my-2 pt-2" />
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-400">현재 보유 크레딧:</span>
+                    <span className="text-slate-400">{t('available_recharge_credit')}:</span>
                     <span className="text-slate-800 dark:text-slate-200">PHP {currentCredit.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-400">차감 후 잔액:</span>
+                    <span className="text-slate-400">{t('remaining_credit')}:</span>
                     <span className={`font-extrabold ${remainingCredit < 0 ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400'}`}>
                       PHP {remainingCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
@@ -1714,7 +1712,7 @@ export default function Transactions() {
                 {isCreditInsufficient ? (
                   <div className="space-y-4">
                     <p className="text-xs text-rose-500 bg-rose-500/5 p-4 rounded-2xl border border-rose-500/10 leading-relaxed font-bold text-center">
-                      보유하신 크레딧 잔액이 거래 수수료보다 부족하여 거래를 진행할 수 없습니다. 안전한 거래 체결을 위해 크레딧을 먼저 충전해 주세요.
+                      {t('credit_deduction_insufficient')}
                     </p>
                     <div className="flex gap-3">
                       <Button
@@ -1723,7 +1721,7 @@ export default function Transactions() {
                         onClick={() => setIsCreditDeductOpen(false)}
                         className="flex-1 h-12 rounded-xl border-slate-200 dark:border-white/10 text-xs active:scale-95 transition-transform"
                       >
-                        닫기
+                        {t('close')}
                       </Button>
                       <Button
                         type="button"
@@ -1733,14 +1731,14 @@ export default function Transactions() {
                         }}
                         className="flex-1 h-12 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs shadow-md shadow-rose-500/25 active:scale-95 transition-all text-center flex items-center justify-center"
                       >
-                        크레딧 충전하기
+                        {t('recharge_credit_btn')}
                       </Button>
                     </div>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     <p className="text-xs text-slate-500 dark:text-slate-400 bg-blue-500/5 p-4 rounded-2xl border border-blue-500/10 leading-relaxed font-bold text-center">
-                      외상 거래 완료 시 플랫폼 중개 수수료가 보유 크레딧에서 즉시 차감되며, 이는 법적으로 취소할 수 없습니다. 이에 동의하고 거래를 최종 체결하시겠습니까?
+                      {t('credit_deduction_confirm')}
                     </p>
                     <div className="flex gap-3">
                       <Button
@@ -1750,7 +1748,7 @@ export default function Transactions() {
                         disabled={isSubmitting}
                         className="flex-1 h-12 rounded-xl border-slate-200 dark:border-white/10 text-xs active:scale-95 transition-transform"
                       >
-                        취소
+                        {t('cancel')}
                       </Button>
                       <Button
                         type="button"
@@ -1761,7 +1759,7 @@ export default function Transactions() {
                         disabled={isSubmitting}
                         className="flex-1 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs shadow-md shadow-blue-500/25 active:scale-95 transition-all flex items-center justify-center"
                       >
-                        동의 및 거래 완료
+                        {t('credit_deduction_btn')}
                       </Button>
                     </div>
                   </div>
@@ -1777,34 +1775,34 @@ export default function Transactions() {
         <DialogContent className="max-w-md w-[95%] h-[85vh] md:h-[75vh] rounded-[32px] dark:bg-slate-950 dark:border-white/5 px-6 pt-8 flex flex-col outline-none overflow-hidden">
           <DialogHeader className="pb-4 shrink-0">
             <DialogTitle className="text-2xl font-black dark:text-white text-center">
-              {matchingType === 'borrower' ? '?좉퇋 ?異??붿껌 怨듦퀬 ?깅줉' : '?좉퇋 ?異??쒓났 怨듦퀬 ?깅줉'}
+              {matchingType === 'borrower' ? t('borrow_post_title') : t('lend_post_title')}
             </DialogTitle>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto py-6 space-y-6 scrollbar-hide">
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="space-y-3">
-                <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">怨듦퀬 援щ텇</Label>
+                <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('post_category')}</Label>
                 <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl">
                   <button 
                     type="button"
                     onClick={() => setMatchingType('borrower')}
                     className={`flex-1 py-3 rounded-xl text-xs font-black transition-all duration-300 ${matchingType === 'borrower' ? 'bg-white dark:bg-blue-600 shadow-md text-blue-600 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}
                   >
-                    ?異??붿껌 (鍮뚮━湲?
+                    {t('borrow_request_tab')}
                   </button>
                   <button 
                     type="button"
                     onClick={() => setMatchingType('lender')}
                     className={`flex-1 py-3 rounded-xl text-xs font-black transition-all duration-300 ${matchingType === 'lender' ? 'bg-white dark:bg-blue-600 shadow-md text-blue-600 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}
                   >
-                    ?異??쒓났 (鍮뚮젮二쇨린)
+                    {t('lend_offer_tab')}
                   </button>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('amount')} (PHP)</Label>
+                <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('amount_php')}</Label>
                 <Input 
                   type="number"
                   value={amount}
@@ -1815,7 +1813,7 @@ export default function Transactions() {
               </div>
               
               <div className="space-y-3">
-                <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">이자율 (%)</Label>
+                <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('interest_rate_percent')}</Label>
                 <Input 
                   type="number"
                   value={interestRate}
@@ -1824,7 +1822,7 @@ export default function Transactions() {
                     const val = parseFloat(e.target.value);
                     if (val > 6) {
                       setInterestRate('6');
-                      toast.warning('필리핀 법정 상한 금리(연 6%) 제한이 적용되어 6%를 초과할 수 없습니다.');
+                      toast.warning(t('interest_rate_warning'));
                     } else {
                       setInterestRate(e.target.value);
                     }
@@ -1835,13 +1833,13 @@ export default function Transactions() {
                 <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/30 rounded-xl text-blue-600 dark:text-blue-400 flex items-start gap-2 animate-in fade-in duration-300">
                   <ShieldCheck className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <span className="text-[10px] font-bold leading-normal">
-                    필리핀 법정 이자율 제한: 대출이자는 법적 상한선인 최대 6%를 넘지 않게 설정해야 합니다.
+                    {t('interest_rate_warning')}
                   </span>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">만기 시 상환 금액</Label>
+                <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('repayment_amount_due')}</Label>
                 <div className="h-20 flex flex-col justify-center px-5 rounded-2xl bg-blue-500/10 dark:bg-blue-600/20 border border-blue-500/25">
                   <span className="text-[10px] font-black uppercase tracking-[0.1em] text-blue-600 dark:text-blue-400 mb-0.5">총 상환 금액 (원금 + 이자)</span>
                   <span className="text-2xl font-black text-blue-700 dark:text-blue-300">

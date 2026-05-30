@@ -310,6 +310,14 @@ export const translations: Dictionary = {
   wallet_copied_toast: { en: "Wallet address copied to clipboard.", tl: "채권자 지갑 주소가 복사되었습니다.", ko: "채권자 지갑 주소가 복사되었습니다.", zh: "钱包地址已复制到剪贴板。", ja: "ウォレットアドレスがクリップボードにコピーされました。" },
   close: { en: "Close", tl: "Isara", ko: "닫기", zh: "关闭", ja: "閉じる" },
   submitting: { en: "Submitting...", tl: "Ipinapadala...", ko: "제출 중...", zh: "正在提交...", ja: "提出中..." },
-  submit_repayment_receipt: { en: "Submit Repayment Receipt", tl: "Ipadala ang Resibo ng Bayad", ko: "상환 영수증 제출", zh: "提交还款收据", ja: "返済証明書を提出" }
+  submit_repayment_receipt: { en: "Submit Repayment Receipt", tl: "Ipadala ang Resibo ng Bayad", ko: "상환 영수증 제출", zh: "提交还款收据", ja: "返済証明書を提出" },
+  borrow_post_title: { en: "Register Borrow Request", tl: "Magrehistro ng Hiling sa Utang", ko: "신규 대출 요청 공고 등록", zh: "发布借款请求", ja: "新規借入リクエスト掲載" },
+  lend_post_title: { en: "Register Lend Offer", tl: "Magrehistro ng Alok sa Utang", ko: "신규 대출 제공 공고 등록", zh: "发布放款报价", ja: "新規貸出オファー掲載" },
+  post_category: { en: "Post Category", tl: "Kategorya ng Post", ko: "공고 구분", zh: "公告分类", ja: "掲載区分" },
+  borrow_request_tab: { en: "Borrow Request (Borrow)", tl: "Hiling sa Utang (Hiram)", ko: "대출 요청 (빌리기)", zh: "借款请求 (借入)", ja: "借入リクエスト (借入)" },
+  lend_offer_tab: { en: "Lend Offer (Lend)", tl: "Alok sa Utang (Pautang)", ko: "대출 제공 (빌려주기)", zh: "放款报价 (贷出)", ja: "貸出オファー (貸出)" },
+  amount_php: { en: "Amount (PHP)", tl: "Halaga (PHP)", ko: "금액 (PHP)", zh: "金额 (PHP)", ja: "金額 (PHP)" },
+  remaining_credit: { en: "Remaining Balance", tl: "Natitirang Balanse", ko: "차감 후 잔액", zh: "扣除后余额", ja: "差し引き後残高" },
+  confirm: { en: "Confirm", tl: "I-confirm", ko: "확인", zh: "确认", ja: "確認" }
 };
 export const getTranslation = (key: string, lang: Language) => { return translations[key]?.[lang] || translations[key]?.['en'] || key; };
