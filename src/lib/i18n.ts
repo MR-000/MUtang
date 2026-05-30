@@ -221,6 +221,8 @@ export const translations: Dictionary = {
   months: { en: "Months", tl: "mga Buwan", ko: "개월", zh: "月", ja: "ヶ月" },
   days: { en: "Days", tl: "Araw", ko: "일", zh: "天", ja: "日" },
   due_date_adjustable: { en: "Adjustable Due Date", tl: "Maaaring Ayusin ang Takdang Petsa", ko: "기일 조정 가능", zh: "截止日期可调", ja: "期日調整可能" },
-  payment_completed_label: { en: "Payment Completed", tl: "Kumpleto ang Bayad", ko: "결제 완료", zh: "支付已完成", ja: "決済完了" }
+  payment_completed_label: { en: "Payment Completed", tl: "Kumpleto ang Bayad", ko: "결제 완료", zh: "支付已完成", ja: "決済完了" },
+  download_pdf: { en: "Download PDF Contract", tl: "I-download ang PDF na Kasunduan", ko: "PDF 계약서 다운로드", zh: "下载 PDF 合同", ja: "PDF契約書ダウンロード" },
+  preparing_pdf: { en: "Preparing PDF...", tl: "Inihahanda ang PDF...", ko: "PDF 준비 중...", zh: "正在准备 PDF...", ja: "PDF準備中..." }
 };
 export const getTranslation = (key: string, lang: Language) => { return translations[key]?.[lang] || translations[key]?.['en'] || key; };

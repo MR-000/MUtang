@@ -134,6 +134,255 @@ export default function Transactions() {
   const [isTransactionOpen, setIsTransactionOpen] = useState(false);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<MatchingRequest | null>(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState<string | null>(null);
+
+  const loadHtml2PdfScript = (): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      if ((window as any).html2pdf) {
+        resolve((window as any).html2pdf);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+      script.async = true;
+      script.onload = () => {
+        if ((window as any).html2pdf) {
+          resolve((window as any).html2pdf);
+        } else {
+          reject(new Error('html2pdf script load failed'));
+        }
+      };
+      script.onerror = () => reject(new Error('html2pdf script load error'));
+      document.body.appendChild(script);
+    });
+  };
+
+  const handleDownloadContractPDF = async (loan: any) => {
+    if (!loan) return;
+    setIsGeneratingPDF(loan.id);
+    
+    try {
+      const html2pdf = await loadHtml2PdfScript();
+      
+      // 서명 파싱 및 서명 데이터 공유 바인딩
+      let lenderSig = '';
+      let borrowerSig = '';
+      try {
+        if (loan.signature_data) {
+          const sigs = JSON.parse(loan.signature_data);
+          lenderSig = sigs.lender || '';
+          borrowerSig = sigs.borrower || '';
+        }
+      } catch (err) {
+        console.error('Signature parse error:', err);
+      }
+
+      // 현지어 계약 문안 및 영어 계약 문안 조립
+      const localDesc = getSmartTranslatedText(loan.description, t);
+      const enDesc = getSmartTranslatedText(loan.description, (key: string) => {
+        const { translations } = require('@/lib/i18n');
+        return translations[key]?.['en'] || translations[key]?.['en'] || key;
+      });
+
+      const localPolicy = getSmartTranslatedText(loan.overdue_policy, t);
+      const enPolicy = getSmartTranslatedText(loan.overdue_policy, (key: string) => {
+        const { translations } = require('@/lib/i18n');
+        return translations[key]?.['en'] || translations[key]?.['en'] || key;
+      });
+
+      // 현지어 라벨들
+      const localTitle = t('debts') + " " + t('transaction') + " " + t('agreement_record');
+      const enTitle = "Credit Transaction Agreement";
+
+      const localLender = t('lender') + " " + t('signature');
+      const enLender = "Lender Signature";
+
+      const localBorrower = t('borrower') + " " + t('signature');
+      const enBorrower = "Borrower Signature";
+
+      const localDate = t('post_date');
+      const enDate = "Transaction Date";
+
+      const localPrincipal = t('principal');
+      const enPrincipal = "Principal Amount";
+
+      const localInterest = t('interest_rate_label');
+      const enInterest = "Interest Rate";
+
+      const localRepay = t('repayment_amount');
+      const enRepay = "Repayment Amount";
+
+      const localDue = t('due_date');
+      const enDue = "Due Date";
+
+      const localDisclaimer = t('legal_disclaimer');
+      const enDisclaimer = "I hereby acknowledge that I have received the goods/services listed above and agree to repay the specified amount on or before the due date.";
+
+      // 임시 템플릿 DOM 생성 (듀얼 페이지 구조: 1페이지 현지어, 2페이지 영문)
+      const container = document.createElement('div');
+      container.style.padding = '40px';
+      container.style.color = '#0f172a';
+      container.style.backgroundColor = '#ffffff';
+      container.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+      container.style.lineHeight = '1.6';
+      container.style.fontSize = '12px';
+      container.style.width = '800px';
+
+      container.innerHTML = `
+        <div style="page-break-after: always; padding-bottom: 20px;">
+          <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">
+            <h1 style="font-size: 20px; font-weight: 900; margin: 0; color: #1e3a8a;">${localTitle}</h1>
+            <p style="font-size: 9px; color: #64748b; margin: 5px 0 0 0;">Transaction ID: ${loan.id}</p>
+          </div>
+
+          <div style="margin-bottom: 25px; background-color: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #f1f5f9;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; color: #64748b; width: 30%;">${t('lender')}:</td>
+                <td style="padding: 6px 0; font-weight: bold; color: #0f172a;">${loan.lender?.full_name || '-'} (${loan.lender?.phone || '-'})</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; color: #64748b;">${t('borrower')}:</td>
+                <td style="padding: 6px 0; font-weight: bold; color: #0f172a;">${loan.borrower?.full_name || '-'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; color: #64748b;">${localDate}:</td>
+                <td style="padding: 6px 0; font-weight: bold; color: #0f172a;">${format(new Date(loan.created_at), 'yyyy-MM-dd HH:mm')}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="margin-bottom: 25px;">
+            <h3 style="font-size: 12px; font-weight: bold; border-left: 3px solid #3b82f6; padding-left: 8px; margin-bottom: 12px; color: #1e293b;">거래 가액 및 상세 상환 규정</h3>
+            <table style="width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; font-size: 11px;">
+              <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold; border-right: 1px solid #e2e8f0;">${localPrincipal}</th>
+                <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold; border-right: 1px solid #e2e8f0;">${localInterest}</th>
+                <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold; border-right: 1px solid #e2e8f0;">${localRepay}</th>
+                <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold;">${localDue}</th>
+              </tr>
+              <tr>
+                <td style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #e2e8f0;">PHP ${Number(loan.amount).toLocaleString()}</td>
+                <td style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #e2e8f0; color: #2563eb;">${loan.verification_evidence?.interest_rate || 0}%</td>
+                <td style="padding: 10px 12px; font-weight: 900; border-right: 1px solid #e2e8f0;">PHP ${Number(loan.repay_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                <td style="padding: 10px 12px; font-weight: bold; color: #e11d48;">${loan.due_date ? format(new Date(loan.due_date), 'yyyy-MM-dd') : '-'}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="margin-bottom: 25px; background-color: #fafafa; border: 1px dashed #e2e8f0; padding: 15px; border-radius: 12px; font-size: 11px;">
+            <p style="margin: 0 0 8px 0;"><strong style="color: #64748b;">${t('transaction_description_label')}:</strong> <span style="font-weight: bold; color: #334155;">${localDesc}</span></p>
+            <p style="margin: 0;"><strong style="color: #64748b;">${t('overdue_rules_label')}:</strong> <span style="font-weight: bold; color: #dc2626;">${localPolicy}</span></p>
+          </div>
+
+          <div style="margin-bottom: 30px; padding: 15px; border: 1px solid #cbd5e1; border-radius: 12px; background-color: #f8fafc; font-size: 11px; text-align: justify; color: #475569;">
+            ${localDisclaimer}
+          </div>
+
+          <div style="display: flex; justify-content: space-between; margin-top: 40px; gap: 20px;">
+            <div style="flex: 1; text-align: center; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px; background-color: #ffffff;">
+              <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">${localLender}</p>
+              <div style="height: 90px; display: flex; align-items: center; justify-content: center;">
+                ${lenderSig ? `<img src="${lenderSig}" style="max-height: 80px; max-width: 100%; object-fit: contain;" />` : '<span style="color: #cbd5e1; font-style: italic;">서명 미등록</span>'}
+              </div>
+              <p style="margin: 8px 0 0 0; font-size: 10px; font-weight: bold; color: #475569;">${loan.lender?.full_name || '-'}</p>
+            </div>
+            <div style="flex: 1; text-align: center; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px; background-color: #ffffff;">
+              <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">${localBorrower}</p>
+              <div style="height: 90px; display: flex; align-items: center; justify-content: center;">
+                ${borrowerSig ? `<img src="${borrowerSig}" style="max-height: 80px; max-width: 100%; object-fit: contain;" />` : '<span style="color: #cbd5e1; font-style: italic;">서명 미등록</span>'}
+              </div>
+              <p style="margin: 8px 0 0 0; font-size: 10px; font-weight: bold; color: #475569;">${loan.borrower?.full_name || '-'}</p>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding-top: 20px;">
+          <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">
+            <h1 style="font-size: 20px; font-weight: 900; margin: 0; color: #1e3a8a;">${enTitle}</h1>
+            <p style="font-size: 9px; color: #64748b; margin: 5px 0 0 0;">Transaction ID: ${loan.id}</p>
+          </div>
+
+          <div style="margin-bottom: 25px; background-color: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #f1f5f9;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; color: #64748b; width: 30%;">Lender:</td>
+                <td style="padding: 6px 0; font-weight: bold; color: #0f172a;">${loan.lender?.full_name || '-'} (${loan.lender?.phone || '-'})</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; color: #64748b;">Borrower:</td>
+                <td style="padding: 6px 0; font-weight: bold; color: #0f172a;">${loan.borrower?.full_name || '-'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; color: #64748b;">${enDate}:</td>
+                <td style="padding: 6px 0; font-weight: bold; color: #0f172a;">${format(new Date(loan.created_at), 'yyyy-MM-dd HH:mm')}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="margin-bottom: 25px;">
+            <h3 style="font-size: 12px; font-weight: bold; border-left: 3px solid #3b82f6; padding-left: 8px; margin-bottom: 12px; color: #1e293b;">Financial Terms and Conditions</h3>
+            <table style="width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; font-size: 11px;">
+              <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold; border-right: 1px solid #e2e8f0;">${enPrincipal}</th>
+                <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold; border-right: 1px solid #e2e8f0;">${enInterest}</th>
+                <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold; border-right: 1px solid #e2e8f0;">${enRepay}</th>
+                <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold;">${enDue}</th>
+              </tr>
+              <tr>
+                <td style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #e2e8f0;">PHP ${Number(loan.amount).toLocaleString()}</td>
+                <td style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #e2e8f0; color: #2563eb;">${loan.verification_evidence?.interest_rate || 0}%</td>
+                <td style="padding: 10px 12px; font-weight: 900; border-right: 1px solid #e2e8f0;">PHP ${Number(loan.repay_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                <td style="padding: 10px 12px; font-weight: bold; color: #e11d48;">${loan.due_date ? format(new Date(loan.due_date), 'yyyy-MM-dd') : '-'}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="margin-bottom: 25px; background-color: #fafafa; border: 1px dashed #e2e8f0; padding: 15px; border-radius: 12px; font-size: 11px;">
+            <p style="margin: 0 0 8px 0;"><strong style="color: #64748b;">Description:</strong> <span style="font-weight: bold; color: #334155;">${enDesc}</span></p>
+            <p style="margin: 0;"><strong style="color: #64748b;">Overdue Rules:</strong> <span style="font-weight: bold; color: #dc2626;">${enPolicy}</span></p>
+          </div>
+
+          <div style="margin-bottom: 30px; padding: 15px; border: 1px solid #cbd5e1; border-radius: 12px; background-color: #f8fafc; font-size: 11px; text-align: justify; color: #475569;">
+            ${enDisclaimer}
+          </div>
+
+          <div style="display: flex; justify-content: space-between; margin-top: 40px; gap: 20px;">
+            <div style="flex: 1; text-align: center; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px; background-color: #ffffff;">
+              <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">${enLender}</p>
+              <div style="height: 90px; display: flex; align-items: center; justify-content: center;">
+                ${lenderSig ? `<img src="${lenderSig}" style="max-height: 80px; max-width: 100%; object-fit: contain;" />` : '<span style="color: #cbd5e1; font-style: italic;">No Signature</span>'}
+              </div>
+              <p style="margin: 8px 0 0 0; font-size: 10px; font-weight: bold; color: #475569;">${loan.lender?.full_name || '-'}</p>
+            </div>
+            <div style="flex: 1; text-align: center; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px; background-color: #ffffff;">
+              <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">${enBorrower}</p>
+              <div style="height: 90px; display: flex; align-items: center; justify-content: center;">
+                ${borrowerSig ? `<img src="${borrowerSig}" style="max-height: 80px; max-width: 100%; object-fit: contain;" />` : '<span style="color: #cbd5e1; font-style: italic;">No Signature</span>'}
+              </div>
+              <p style="margin: 8px 0 0 0; font-size: 10px; font-weight: bold; color: #475569;">${loan.borrower?.full_name || '-'}</p>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const opt = {
+        margin: 0,
+        filename: `Agreement_${loan.id}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
+
+      await html2pdf().from(container).set(opt).save();
+      toast.success(t('link_generated') || 'PDF 계약서 다운로드 완료');
+    } catch (error) {
+      console.error('PDF Generation Error:', error);
+      toast.error(t('link_failed') || 'PDF 다운로드에 실패했습니다.');
+    } finally {
+      setIsGeneratingPDF(null);
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -955,6 +1204,17 @@ export default function Transactions() {
                         </span>
                       </div>
                     )}
+                    
+                    <div className="mt-3.5 pt-2 border-t border-slate-100 dark:border-white/5 flex gap-2">
+                      <Button
+                        onClick={() => handleDownloadContractPDF(loan)}
+                        disabled={isGeneratingPDF === loan.id}
+                        variant="outline"
+                        className="flex-1 rounded-xl font-bold h-8 text-[11px] border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1.5 text-slate-700 dark:text-slate-200"
+                      >
+                        {isGeneratingPDF === loan.id ? t('preparing_pdf') : t('download_pdf')}
+                      </Button>
+                    </div>
                   </div>
 
                   {/* Payment Proof details section */}
