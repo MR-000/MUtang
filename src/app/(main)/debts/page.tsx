@@ -218,6 +218,9 @@ export default function Transactions() {
       const localDisclaimer = t('legal_disclaimer');
       const enDisclaimer = "I hereby acknowledge that I have received the goods/services listed above and agree to repay the specified amount on or before the due date.";
 
+      const localTermsTitle = t('financial_terms_title') || '거래 가액 및 상세 상환 규정';
+      const localSignatureNotRegistered = t('signature_not_registered') || '서명 미등록';
+
       // 임시 템플릿 DOM 생성 (듀얼 페이지 구조: 1페이지 현지어, 2페이지 영문)
       const container = document.createElement('div');
       container.style.padding = '40px';
@@ -253,7 +256,7 @@ export default function Transactions() {
           </div>
 
           <div style="margin-bottom: 25px;">
-            <h3 style="font-size: 12px; font-weight: bold; border-left: 3px solid #3b82f6; padding-left: 8px; margin-bottom: 12px; color: #1e293b;">거래 가액 및 상세 상환 규정</h3>
+            <h3 style="font-size: 12px; font-weight: bold; border-left: 3px solid #3b82f6; padding-left: 8px; margin-bottom: 12px; color: #1e293b;">${localTermsTitle}</h3>
             <table style="width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; font-size: 11px;">
               <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
                 <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold; border-right: 1px solid #e2e8f0;">${localPrincipal}</th>
@@ -283,14 +286,14 @@ export default function Transactions() {
             <div style="flex: 1; text-align: center; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px; background-color: #ffffff;">
               <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">${localLender}</p>
               <div style="height: 90px; display: flex; align-items: center; justify-content: center;">
-                ${lenderSig ? `<img src="${lenderSig}" style="max-height: 80px; max-width: 100%; object-fit: contain;" />` : '<span style="color: #cbd5e1; font-style: italic;">서명 미등록</span>'}
+                ${lenderSig ? `<img src="${lenderSig}" style="max-height: 80px; max-width: 100%; object-fit: contain;" />` : `<span style="color: #cbd5e1; font-style: italic;">${localSignatureNotRegistered}</span>`}
               </div>
               <p style="margin: 8px 0 0 0; font-size: 10px; font-weight: bold; color: #475569;">${loan.lender?.full_name || '-'}</p>
             </div>
             <div style="flex: 1; text-align: center; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px; background-color: #ffffff;">
               <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">${localBorrower}</p>
               <div style="height: 90px; display: flex; align-items: center; justify-content: center;">
-                ${borrowerSig ? `<img src="${borrowerSig}" style="max-height: 80px; max-width: 100%; object-fit: contain;" />` : '<span style="color: #cbd5e1; font-style: italic;">서명 미등록</span>'}
+                ${borrowerSig ? `<img src="${borrowerSig}" style="max-height: 80px; max-width: 100%; object-fit: contain;" />` : `<span style="color: #cbd5e1; font-style: italic;">${localSignatureNotRegistered}</span>`}
               </div>
               <p style="margin: 8px 0 0 0; font-size: 10px; font-weight: bold; color: #475569;">${loan.borrower?.full_name || '-'}</p>
             </div>
@@ -439,6 +442,7 @@ export default function Transactions() {
     back2: { file: null, preview: null }
   });
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
+  const [isIdWarningOpen, setIsIdWarningOpen] = useState(false);
 
   const handlePhotoCapture = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1613,7 +1617,20 @@ export default function Transactions() {
 
               return (
                 <Button 
-                  onClick={() => txStep < 3 ? setTxStep(prev => prev + 1) : handleCreateTransaction()}
+                  onClick={() => {
+                    if (txStep === 2) {
+                      const front1Captured = !!idPhotos.front1.preview;
+                      const back1Captured = !!idPhotos.back1.preview;
+                      const front2Captured = !!idPhotos.front2.preview;
+                      const back2Captured = !!idPhotos.back2.preview;
+                      
+                      if (!front1Captured || !back1Captured || !front2Captured || !back2Captured) {
+                        setIsIdWarningOpen(true);
+                        return;
+                      }
+                    }
+                    txStep < 3 ? setTxStep(prev => prev + 1) : handleCreateTransaction();
+                  }}
                   disabled={(txStep === 1 && (!amount || isCreditInsufficient)) || txStep === 3 && (!lenderSignature || !borrowerSignature) || isSubmitting || isUploadingPhotos}
                   className="flex-1 h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-[24px] font-black text-xl shadow-2xl shadow-blue-500/40 active:scale-95 transition-all"
                 >
@@ -1622,6 +1639,29 @@ export default function Transactions() {
               );
             })()}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ID Verification Warning Modal */}
+      <Dialog open={isIdWarningOpen} onOpenChange={setIsIdWarningOpen}>
+        <DialogContent className="max-w-sm w-[90%] rounded-[32px] dark:bg-slate-950 dark:border-white/5 p-6 outline-none flex flex-col items-center text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-rose-100 dark:bg-rose-500/10 flex items-center justify-center text-rose-600 dark:text-rose-400">
+            <AlertTriangle className="w-8 h-8 animate-bounce" />
+          </div>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black dark:text-white">
+              {t('id_warning_title') || '신분증 촬영 필수'}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-bold">
+            {t('id_warning_message') || '안전한 외상 거래 체결을 위해 양측 거래 당사자의 1차, 2차 신분증 앞/뒷면을 모두 촬영해 주세요.'}
+          </p>
+          <Button 
+            onClick={() => setIsIdWarningOpen(false)}
+            className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-sm active:scale-95 transition-all shadow-md"
+          >
+            {t('confirm') || '확인'}
+          </Button>
         </DialogContent>
       </Dialog>
 

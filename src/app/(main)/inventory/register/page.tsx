@@ -11,6 +11,18 @@ import { ArrowLeft, ScanBarcode, PackagePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
+const BarcodeScanner = dynamic(
+  () => import('@/components/ui/BarcodeScanner').then(mod => mod.BarcodeScanner),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center text-white font-black text-lg animate-pulse">
+        Loading...
+      </div>
+    )
+  }
+);
+
 export default function RegisterProductPage() {
   const { user, t } = useAuth();
   const router = useRouter();
@@ -19,18 +31,6 @@ export default function RegisterProductPage() {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const BarcodeScanner = dynamic(
-    () => import('@/components/ui/BarcodeScanner').then(mod => mod.BarcodeScanner),
-    {
-      ssr: false,
-      loading: () => (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center text-white font-black text-lg animate-pulse">
-          {t('camera_scanner_loading')}
-        </div>
-      )
-    }
-  );
 
   const handleScan = (code: string) => {
     setBarcode(code);

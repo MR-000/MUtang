@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
 import { Camera, X } from 'lucide-react';
 import { Button } from './button';
@@ -13,37 +13,51 @@ interface BarcodeScannerProps {
 
 export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [error, setError] = useState<string>('');
+  const errorRef = useRef<HTMLDivElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+
+  // 콜백을 ref로 보관 → 렌더링마다 새 참조가 생겨도 effect 재실행 방지
+  const onScanRef = useRef(onScan);
+  const onCloseRef = useRef(onClose);
   const { t } = useAuth();
-  
+
+  useEffect(() => { onScanRef.current = onScan; }, [onScan]);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('utang-event-scanner-mount'));
-    
-    // 싱글톤 브라우저 스캐너 생성 및 보관
+
     const codeReader = new BrowserMultiFormatReader();
     codeReaderRef.current = codeReader;
-    
+
     const startScanner = async () => {
       try {
         const videoInputDevices = await codeReader.listVideoInputDevices();
         if (videoInputDevices.length === 0) {
-          setError(t('camera_not_found') || "Camera device not found.");
+          if (errorRef.current) {
+            errorRef.current.textContent = t('camera_not_found') || 'Camera device not found.';
+            errorRef.current.style.display = 'flex';
+          }
+          if (videoRef.current) videoRef.current.style.display = 'none';
           return;
         }
 
-        // 후면 카메라 우선 선택 로직
+        // 후면 카메라 우선 선택
         let selectedDeviceId = videoInputDevices[0].deviceId;
         for (const device of videoInputDevices) {
           const label = device.label.toLowerCase();
-          if (label.includes('back') || label.includes('environment') || label.includes('rear') || label.includes('후면')) {
+          if (
+            label.includes('back') ||
+            label.includes('environment') ||
+            label.includes('rear') ||
+            label.includes('후면')
+          ) {
             selectedDeviceId = device.deviceId;
             break;
           }
         }
 
         if (videoRef.current) {
-          // zxing decodeFromConstraints 적용: 해상도 강제 및 초점 개선
           const constraints: MediaStreamConstraints = {
             video: {
               deviceId: { exact: selectedDeviceId },
@@ -53,21 +67,30 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
             }
           };
 
-          await codeReader.decodeFromConstraints(constraints, videoRef.current, (result, err) => {
-            if (result) {
-              onScan(result.getText());
-              // 한 번 스캔 성공 시 안전하게 정리하고 스캐너 종료
-              codeReader.reset();
-              onClose();
+          await codeReader.decodeFromConstraints(
+            constraints,
+            videoRef.current,
+            (result, err) => {
+              if (result) {
+                codeReader.reset();
+                onScanRef.current(result.getText());
+                onCloseRef.current();
+              }
+              if (err && !(err instanceof NotFoundException)) {
+                console.error(err);
+              }
             }
-            if (err && !(err instanceof NotFoundException)) {
-              console.error(err);
-            }
-          });
+          );
         }
       } catch (err: any) {
-        console.error("Camera init error:", err);
-        setError(t('camera_access_denied') || "No camera access or camera is in use by another app. Please grant permission.");
+        console.error('Camera init error:', err);
+        if (errorRef.current) {
+          errorRef.current.textContent =
+            t('camera_access_denied') ||
+            'No camera access or camera is in use by another app. Please grant permission.';
+          errorRef.current.style.display = 'flex';
+        }
+        if (videoRef.current) videoRef.current.style.display = 'none';
       }
     };
 
@@ -80,7 +103,8 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
         codeReaderRef.current = null;
       }
     };
-  }, [onScan, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 빈 배열 고정 - onScan/onClose는 ref로 관리
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
@@ -95,32 +119,31 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
       </div>
 
       <div className="relative flex-1 flex items-center justify-center overflow-hidden">
-        {error ? (
-          <div className="text-red-500 font-bold p-6 bg-white/10 rounded-2xl text-center backdrop-blur-md max-w-xs mx-auto leading-relaxed text-xs">
-            {error}
-          </div>
-        ) : (
-          <video 
-            ref={videoRef} 
-            className="w-full h-full object-cover"
-            playsInline
-            muted
-          />
-        )}
+        {/* 에러 메시지 (초기에는 숨김) */}
+        <div
+          ref={errorRef}
+          style={{ display: 'none' }}
+          className="text-red-500 font-bold p-6 bg-white/10 rounded-2xl text-center backdrop-blur-md max-w-xs mx-auto leading-relaxed text-xs items-center justify-center"
+        />
 
-        {/* Compact scanner overlay frame for low-end close-up focus */}
+        <video
+          ref={videoRef}
+          className="w-full h-full object-cover"
+          playsInline
+          muted
+        />
+
+        {/* 스캐너 프레임 오버레이 */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/40">
           <div className="w-[85%] max-w-sm h-40 border-2 border-green-500 rounded-2xl relative bg-transparent flex flex-col justify-between overflow-hidden">
-            {/* Corner markers */}
             <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-green-500 rounded-tl-md" />
             <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-green-500 rounded-tr-md" />
             <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-green-500 rounded-bl-md" />
             <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-green-500 rounded-br-md" />
-            {/* Scanning line animation */}
             <div className="w-full h-0.5 bg-green-500 animate-[pulse_2s_ease-in-out_infinite] shadow-[0_0_8px_2px_rgba(34,197,94,0.6)] my-auto" />
           </div>
         </div>
-        
+
         <p className="absolute bottom-10 text-white/90 font-bold text-xs bg-black/75 px-4 py-2.5 rounded-full text-center max-w-[90%] backdrop-blur-sm tracking-wide">
           {t('align_barcode_hint') || 'Align barcode inside the frame (Bring it closer to scan)'}
         </p>
