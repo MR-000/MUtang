@@ -2008,7 +2008,7 @@ export default function Transactions() {
                   className="w-5 h-5 rounded-md border-slate-300 dark:border-white/20 text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
                 <label htmlFor="isAdjustable" className="text-sm font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
-                  기일 조정 가능 (상호 합의 하에 기일 조율 가능)
+                  {t('due_date_adjustable_checkbox')}
                 </label>
               </div>
 
@@ -2017,7 +2017,7 @@ export default function Transactions() {
                 <Input 
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="공고에 대한 설명과 상세 목적을 입력해 보세요."
+                  placeholder={t('post_description_placeholder')}
                   className="h-16 rounded-2xl bg-slate-50 dark:bg-white/5 border-none font-bold focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -2030,14 +2030,14 @@ export default function Transactions() {
               onClick={() => setIsPostModalOpen(false)}
               className="h-16 flex-1 rounded-[24px] border-slate-200 dark:border-white/10 font-bold active:scale-95 transition-transform"
             >
-              취소
+              {t('cancel')}
             </Button>
             <Button 
               onClick={handleCreatePost}
               disabled={!amount || isSubmitting}
               className="flex-1 h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-[24px] font-black text-xl shadow-2xl shadow-blue-500/40 active:scale-95 transition-all"
             >
-              {isSubmitting ? '등록 중...' : '공고 등록하기'}
+              {isSubmitting ? t('post_publishing') : t('post_publish')}
             </Button>
           </div>
         </DialogContent>
@@ -2053,7 +2053,7 @@ export default function Transactions() {
         <DialogContent className="max-w-md w-[95%] rounded-[32px] dark:bg-slate-950 dark:border-white/5 px-5 pt-7 pb-7 outline-none flex flex-col max-h-[85vh] overflow-y-auto">
           <DialogHeader className="shrink-0">
             <DialogTitle className="text-xl font-black dark:text-white text-center">
-              상환 결제 및 증빙 제출
+              {t('repayment_evidence_submit_title')}
             </DialogTitle>
           </DialogHeader>
 
@@ -2064,14 +2064,14 @@ export default function Transactions() {
               onClick={() => setPaymentMethod('gcash')}
               className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${paymentMethod === 'gcash' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
             >
-              GCash 상환
+              {t('gcash_repay')}
             </button>
             <button
               type="button"
               onClick={() => setPaymentMethod('coin')}
               className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${paymentMethod === 'coin' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
             >
-              USDT / USDC 코인 상환
+              {t('coin_repay')}
             </button>
           </div>
 
@@ -2081,14 +2081,14 @@ export default function Transactions() {
                 {/* GCash Lender Account Details */}
                 <div className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5 space-y-2.5 text-xs">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-slate-400">채권자 이름:</span>
+                    <span className="font-bold text-slate-400">{t('lender_name')}:</span>
                     <span className="font-extrabold text-slate-800 dark:text-slate-100">{payingLoan?.lender?.full_name || '-'}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-slate-400">GCash 송금 번호:</span>
+                    <span className="font-bold text-slate-400">{t('gcash_transfer_number')}:</span>
                     <div className="flex items-center gap-2">
                       <span className="font-black text-blue-600 dark:text-blue-400">
-                        {payingLoan?.lender?.gcash_number || payingLoan?.lender?.phone || '등록된 번호 없음'}
+                        {payingLoan?.lender?.gcash_number || payingLoan?.lender?.phone || t('no_number_registered')}
                       </span>
                       {(payingLoan?.lender?.gcash_number || payingLoan?.lender?.phone) && (
                         <Button 
@@ -2099,10 +2099,10 @@ export default function Transactions() {
                           onClick={() => {
                             const num = payingLoan.lender.gcash_number || payingLoan.lender.phone;
                             navigator.clipboard.writeText(num);
-                            toast.success('전화번호가 복사되었습니다.');
+                            toast.success(t('phone_copied_toast'));
                           }}
                         >
-                          복사
+                          {t('copy')}
                         </Button>
                       )}
                     </div>
@@ -2112,7 +2112,7 @@ export default function Transactions() {
                 {/* Lender GCash QR Code */}
                 {payingLoan?.lender?.gcash_qr_url ? (
                   <div className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5 space-y-2">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">채권자 GCash QR 코드</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t('lender_gcash_qr')}</span>
                     <div className="relative w-36 h-36 bg-white rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 p-1.5 shadow-sm">
                       <img 
                         src={payingLoan.lender.gcash_qr_url} 
@@ -2120,13 +2120,13 @@ export default function Transactions() {
                         className="w-full h-full object-contain"
                       />
                     </div>
-                    <span className="text-[9px] text-slate-400 font-bold">이미지를 길게 눌러 앨범에 저장할 수 있습니다.</span>
+                    <span className="text-[9px] text-slate-400 font-bold">{t('save_image_hint')}</span>
                   </div>
                 ) : (
                   <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl text-amber-600 dark:text-amber-400 flex items-start gap-2 text-xs font-bold leading-relaxed">
                     <Info className="w-4 h-4 shrink-0 mt-0.5" />
                     <span>
-                      채권자가 QR 코드를 등록하지 않았습니다. 위 전화번호로 직접 GCash 송금을 진행해 주세요.
+                      {t('lender_no_qr_hint')}
                     </span>
                   </div>
                 )}
@@ -2138,19 +2138,19 @@ export default function Transactions() {
                     variant="outline"
                     onClick={() => {
                       window.location.href = 'gcash://';
-                      toast.success('GCash를 실행시도합니다.');
+                      toast.success(t('launching_gcash_toast'));
                     }}
                     className="flex-1 h-12 rounded-xl border-blue-200 dark:border-blue-900/50 hover:bg-blue-50 dark:hover:bg-blue-950/20 text-blue-600 font-extrabold text-xs flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all"
                   >
                     <Wallet className="w-3.5 h-3.5" />
-                    지캐시 앱 실행
+                    {t('launch_gcash_app_btn')}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => {
                       window.open('https://www.gcash.com', '_blank');
-                      toast.success('GCash 웹페이지로 이동합니다.');
+                      toast.success(t('go_to_gcash_web_toast'));
                     }}
                     className="flex-1 h-12 rounded-xl border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300 font-extrabold text-xs flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all"
                   >
@@ -2192,7 +2192,7 @@ export default function Transactions() {
                     <span className="font-bold text-slate-400">{t('lender_wallet_address')}:</span>
                     <div className="flex items-center justify-between gap-2 p-2 bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/5">
                       <span className="font-mono text-[10px] break-all select-all text-slate-700 dark:text-slate-300 w-[80%] leading-relaxed">
-                        {payingLoan?.lender?.solana_wallet || '지갑 주소가 미등록 상태입니다'}
+                        {payingLoan?.lender?.solana_wallet || t('wallet_not_registered')}
                       </span>
                       {payingLoan?.lender?.solana_wallet && (
                         <Button 
@@ -2202,7 +2202,7 @@ export default function Transactions() {
                           className="h-7 px-2 text-[10px] font-black rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 active:scale-95 transition-all text-slate-500 shrink-0"
                           onClick={() => {
                             navigator.clipboard.writeText(payingLoan.lender.solana_wallet);
-                            toast.success('채권자 지갑 주소가 복사되었습니다.');
+                            toast.success(t('wallet_copied_toast'));
                           }}
                         >
                           {t('copy')}
@@ -2311,7 +2311,7 @@ export default function Transactions() {
               disabled={isUploadingProof}
               className="flex-1 h-12 rounded-xl border-slate-200 dark:border-white/10 font-bold text-xs active:scale-95 transition-transform"
             >
-              닫기
+              {t('close')}
             </Button>
             <Button
               type="button"
@@ -2322,12 +2322,12 @@ export default function Transactions() {
               {isUploadingProof ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  제출 중...
+                  {t('submitting')}
                 </>
               ) : (
                 <>
                   <Upload className="w-3.5 h-3.5" />
-                  상환 영수증 제출
+                  {t('submit_repayment_receipt')}
                 </>
               )}
             </Button>
