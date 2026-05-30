@@ -22,7 +22,7 @@ export default function Login() {
     e.preventDefault();
     
     // Admin ID Bypass Detection
-    if (phoneNumber === 'id-090941144114') {
+    if (phoneNumber === 'tkdghksl0531@gmail.com') {
       setStep('admin_pass');
       toast.info('관리자 계정이 감지되었습니다. 비밀번호를 입력하세요.');
       return;
