@@ -702,7 +702,7 @@ export default function Transactions() {
                 <div className="relative flex-1 group">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                   <Input 
-                    placeholder="이름, 가게명 또는 금액 검색"
+                    placeholder={t('search_users_placeholder')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-9 h-9 text-xs rounded-xl border-slate-200 dark:border-white/5 bg-white dark:bg-white/5 font-bold focus:ring-1 focus:ring-blue-500"
@@ -817,13 +817,13 @@ export default function Transactions() {
                   <div className="space-y-1 px-1 border-t border-dashed border-slate-100 dark:border-white/5 pt-1.5">
                     {req.description && (
                       <div className="flex gap-1.5 text-[11px]">
-                        <span className="font-bold text-slate-400 shrink-0">거래 설명:</span>
+                        <span className="font-bold text-slate-400 shrink-0">{t('transaction_description_label')}:</span>
                         <span className="font-bold text-slate-700 dark:text-slate-300">{req.description}</span>
                       </div>
                     )}
                     {req.overdue_policy && (
                       <div className="flex gap-1.5 text-[11px]">
-                        <span className="font-bold text-rose-400/80 shrink-0">미납 시 규정:</span>
+                        <span className="font-bold text-rose-400/80 shrink-0">{t('overdue_rules_label')}:</span>
                         <span className="font-bold text-rose-600 dark:text-rose-400">{req.overdue_policy}</span>
                       </div>
                     )}

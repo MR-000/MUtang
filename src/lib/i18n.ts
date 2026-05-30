@@ -193,6 +193,23 @@ export const translations: Dictionary = {
   notification_disabled_toast: { en: 'Notifications disabled.', tl: 'Naka-disable na ang alerts.', ko: '알림이 해제됐습니다.', zh: '通知已关闭。', ja: '通知が解除されました。' },
   notification_enabled_toast: { en: 'Notifications enabled!', tl: 'Naka-enable na ang alerts!', ko: '알림이 활성화됐습니다!', zh: '通知已开启！', ja: '通知が有効化されました！' },
   notification_allow_hint_toast: { en: 'Please allow notification permission.', tl: 'Paki-allow ang notification permission.', ko: '알림 권한을 허용해 주세요.', zh: '请允许通知权限。', ja: '通知権限を許可してください。' },
-  solana_address_placeholder: { en: 'Solana wallet address (USDT/USDC receiver)', tl: 'Solana wallet address (para sa USDT/USDC)', ko: '솔라나 지갑 주소 (USDT/USDC 수금용)', zh: 'Solana 钱包地址 (用于 USDT/USDC 收款)', ja: 'ソラナウォレットアドレス（USDT/USDC受信用）' }
+  solana_address_placeholder: { en: 'Solana wallet address (USDT/USDC receiver)', tl: 'Solana wallet address (para sa USDT/USDC)', ko: '솔라나 지갑 주소 (USDT/USDC 수금용)', zh: 'Solana 钱包地址 (用于 USDT/USDC 收款)', ja: 'ソラナウォレットアドレス（USDT/USDC受信用）' },
+  mobile_inventory: { en: 'Mobile Inventory', tl: 'Imbentaryo sa Mobile', ko: '모바일 재고관리', zh: '移动库存', ja: 'モバイル在庫管理' },
+  scan_save_check: { en: 'Scan, save, and verify.', tl: 'I-scan, i-save, at i-verify.', ko: '스캔하고, 저장하고, 확인하세요.', zh: '扫描，保存，并核对。', ja: 'スキャンして、保存して、確認してください。' },
+  today_revenue: { en: "Today's Sales", tl: 'Mga Benta Ngayong Araw', ko: '오늘의 매출', zh: '今日销售额', ja: '今日の売上' },
+  total_sales_count: { en: 'Total {count} sold', tl: 'Kabuuang {count} naibenta', ko: '총 {count}개 판매', zh: '共销售 {count} 件', ja: '合計 {count} 個販売' },
+  registered_products_count: { en: 'Registered Products', tl: 'Mga Rehistradong Produkto', ko: '등록된 상품 수', zh: '已注册产品数', ja: '登録された商品数' },
+  status: { en: 'Status', tl: 'Katayuan', ko: '상태', zh: '状态', ja: '状態' },
+  auto_synced: { en: 'Auto-Synced', tl: 'Auto-Synced', ko: '자동 동기화 됨', zh: '自动同步', ja: '自動同期化' },
+  select_task: { en: 'Select Task', tl: 'Pumili ng Gawain', ko: '업무 선택', zh: '选择任务', ja: '業務選択' },
+  sell_barcode_scan: { en: 'Sell (Barcode Scan)', tl: 'Magbenta (Barcode Scan)', ko: '판매 (바코드 스캔)', zh: '销售 (条码扫描)', ja: '販売 (バーコードスキャン)' },
+  sell_barcode_desc: { en: 'Scan barcode to sell instantly.', tl: 'I-scan ang barcode para magbenta agad.', ko: '바코드를 찍어 즉시 판매합니다.', zh: '扫描条码立即销售。', ja: 'バーコードをスキャンして即座に販売します。' },
+  inbound_stock: { en: 'Restock Items', tl: 'Magdagdag ng Imbentaryo', ko: '상품 입고', zh: '产品入库', ja: '商品入庫' },
+  inbound_stock_desc: { en: 'Scan barcode to add stock quantities.', tl: 'I-scan ang barcode para magdagdag ng stock.', ko: '바코드를 찍어 수량을 추가합니다.', zh: '扫描条码以增加库存数量。', ja: 'バーコードをスキャンして在庫数を追加します。' },
+  register_new_product: { en: 'Register New Product', tl: 'Magrehistro ng Bagong Produkto', ko: '신규 상품 등록', zh: '注册新产品', ja: '新規商品登録' },
+  register_new_product_desc: { en: 'Register a new barcode and its price.', tl: 'Magrehistro ng bagong barcode at presyo nito.', ko: '새로운 바코드와 가격을 등록합니다.', zh: '注册新条码及其价格。', ja: '新しいバーコードと価格を登録します。' },
+  search_users_placeholder: { en: 'Search by name, store, or amount', tl: 'Maghanap sa pangalan, tindahan, o halaga', ko: '이름, 가게명 또는 금액 검색', zh: '按姓名、店铺或金额搜索', ja: '名前、店舗、または金額で検索' },
+  transaction_description_label: { en: 'Transaction Description', tl: 'Deskripsyon ng Transaksyon', ko: '거래 설명', zh: '交易描述', ja: '取引説明' },
+  overdue_rules_label: { en: 'Overdue Rules', tl: 'Mga Patakaran sa Overdue', ko: '미납 시 규정', zh: '逾期规则', ja: '未払い規約' }
 };
 export const getTranslation = (key: string, lang: Language) => { return translations[key]?.[lang] || translations[key]?.['en'] || key; };

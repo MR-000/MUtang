@@ -8,7 +8,7 @@ import { Package, TrendingUp, ShoppingCart, PlusCircle, ArrowDownToLine, History
 import { useRouter } from 'next/navigation';
 
 export default function InventoryDashboard() {
-  const { user } = useAuth();
+  const { user, t } = useAuth();
   const router = useRouter();
   
   const [totalProducts, setTotalProducts] = useState(0);
@@ -64,24 +64,24 @@ export default function InventoryDashboard() {
 
   const navItems = [
     {
-      title: "판매 (바코드 스캔)",
-      desc: "바코드를 찍어 즉시 판매합니다.",
+      title: t('sell_barcode_scan'),
+      desc: t('sell_barcode_desc'),
       icon: <ShoppingCart className="w-8 h-8" />,
       href: "/inventory/sell",
       color: "bg-blue-500",
       shadow: "shadow-blue-500/20"
     },
     {
-      title: "상품 입고",
-      desc: "바코드를 찍어 수량을 추가합니다.",
+      title: t('inbound_stock'),
+      desc: t('inbound_stock_desc'),
       icon: <ArrowDownToLine className="w-8 h-8" />,
       href: "/inventory/inbound",
       color: "bg-green-500",
       shadow: "shadow-green-500/20"
     },
     {
-      title: "신규 상품 등록",
-      desc: "새로운 바코드와 가격을 등록합니다.",
+      title: t('register_new_product'),
+      desc: t('register_new_product_desc'),
       icon: <PlusCircle className="w-8 h-8" />,
       href: "/inventory/register",
       color: "bg-purple-500",
@@ -92,8 +92,8 @@ export default function InventoryDashboard() {
   return (
     <div className="space-y-6 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <header>
-        <h1 className="text-2xl font-black dark:text-white">모바일 재고관리</h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium">스캔하고, 저장하고, 확인하세요.</p>
+        <h1 className="text-2xl font-black dark:text-white">{t('mobile_inventory')}</h1>
+        <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium">{t('scan_save_check')}</p>
       </header>
 
       {/* Dashboard Stats */}
@@ -101,18 +101,20 @@ export default function InventoryDashboard() {
         <Card className="col-span-2 p-5 bg-gradient-to-br from-slate-900 to-slate-800 dark:from-white/10 dark:to-white/5 border-none text-white shadow-xl flex flex-col justify-center rounded-[24px]">
           <div className="flex items-center gap-2 text-white/70 mb-2 font-bold text-sm">
             <TrendingUp className="w-4 h-4" />
-            오늘의 매출
+            {t('today_revenue')}
           </div>
           <div className="text-4xl font-black">
             ₱{todayRevenue.toLocaleString()}
           </div>
-          <div className="text-sm mt-2 text-white/50 font-medium">총 {todaySales}개 판매</div>
+          <div className="text-sm mt-2 text-white/50 font-medium">
+            {t('total_sales_count').replace('{count}', todaySales.toString())}
+          </div>
         </Card>
 
         <Card className="p-5 bg-white dark:bg-slate-900 border-none shadow-lg rounded-[24px]">
           <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 mb-2 font-bold text-xs">
             <Package className="w-4 h-4" />
-            등록된 상품 수
+            {t('registered_products_count')}
           </div>
           <div className="text-2xl font-black text-slate-900 dark:text-white">
             {totalProducts}
@@ -121,8 +123,8 @@ export default function InventoryDashboard() {
 
         <Card className="p-5 bg-white dark:bg-slate-900 border-none shadow-lg rounded-[24px] flex items-center justify-between" onClick={() => fetchDashboardData()}>
           <div>
-            <div className="text-slate-500 dark:text-slate-400 mb-2 font-bold text-xs">상태</div>
-            <div className="text-lg font-black text-green-500">자동 동기화 됨</div>
+            <div className="text-slate-500 dark:text-slate-400 mb-2 font-bold text-xs">{t('status')}</div>
+            <div className="text-lg font-black text-green-500">{t('auto_synced')}</div>
           </div>
           <History className="w-6 h-6 text-slate-200 dark:text-slate-700" />
         </Card>
@@ -130,7 +132,7 @@ export default function InventoryDashboard() {
 
       {/* One Screen One Function Navigation */}
       <div className="space-y-4 mt-8">
-        <h2 className="text-lg font-bold dark:text-white px-1">업무 선택</h2>
+        <h2 className="text-lg font-bold dark:text-white px-1">{t('select_task')}</h2>
         {navItems.map((item, i) => (
           <button
             key={i}
