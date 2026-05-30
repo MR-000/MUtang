@@ -723,7 +723,7 @@ export default function Transactions() {
                 className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-blue-600 dark:hover:bg-blue-600 dark:hover:text-white transition-colors rounded-xl font-black h-9 text-xs shadow-sm active:scale-[0.98] mt-0.5"
               >
                 <Plus className="w-4 h-4 mr-0.5" />
-                {matchingType === 'borrower' ? '대출 요청 공고 등록하기' : '대출 제공 공고 등록하기'}
+                {matchingType === 'borrower' ? t('register_borrow_post') : t('register_lend_post')}
               </Button>
 
               {/* Sorting Chips */}
@@ -732,22 +732,26 @@ export default function Transactions() {
                   onClick={() => setSortAmount(prev => prev === 'asc' ? null : 'asc')}
                   className={`px-2.5 py-1 text-[10px] font-bold rounded-full transition-all border ${sortAmount === 'asc' ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30' : 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-white/5 dark:text-slate-400 dark:border-white/10'}`}
                 >
-                  낮은 금액순                </button>
+                  {t('sort_low_amount')}
+                </button>
                 <button
                   onClick={() => setSortAmount(prev => prev === 'desc' ? null : 'desc')}
                   className={`px-2.5 py-1 text-[10px] font-bold rounded-full transition-all border ${sortAmount === 'desc' ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30' : 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-white/5 dark:text-slate-400 dark:border-white/10'}`}
                 >
-                  높은 금액순                </button>
+                  {t('sort_high_amount')}
+                </button>
                 <button
                   onClick={() => setSortInterest(prev => prev === 'asc' ? null : 'asc')}
                   className={`px-2.5 py-1 text-[10px] font-bold rounded-full transition-all border ${sortInterest === 'asc' ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30' : 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-white/5 dark:text-slate-400 dark:border-white/10'}`}
                 >
-                  낮은 이자율순                </button>
+                  {t('sort_low_interest')}
+                </button>
                 <button
                   onClick={() => setSortInterest(prev => prev === 'desc' ? null : 'desc')}
                   className={`px-2.5 py-1 text-[10px] font-bold rounded-full transition-all border ${sortInterest === 'desc' ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30' : 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-white/5 dark:text-slate-400 dark:border-white/10'}`}
                 >
-                  높은 이자율순                </button>
+                  {t('sort_high_interest')}
+                </button>
               </div>
             </div>
           </div>
@@ -777,7 +781,7 @@ export default function Transactions() {
                           {req.poster_profile?.trust_tier && <TierBadge tier={req.poster_profile.trust_tier} />}
                         </div>
                         <p className="text-[10px] text-slate-400 font-bold">
-                          공고일: {format(new Date(req.created_at), 'yyyy-MM-dd')}
+                          {t('post_date')}: {format(new Date(req.created_at), 'yyyy-MM-dd')}
                         </p>
                       </div>
                     </div>
@@ -791,19 +795,19 @@ export default function Transactions() {
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">원금</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('principal')}</p>
                       <p className="font-bold text-slate-800 dark:text-slate-200 text-xs">PHP {Number(req.amount).toLocaleString()}</p>
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">이자율</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('interest_rate_label')}</p>
                       <p className="font-bold text-blue-600 dark:text-blue-400 text-xs">{req.interest_rate || 0}%</p>
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">만기 시 상환액</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('repayment_amount')}</p>
                       <p className="font-black text-slate-900 dark:text-white text-xs">PHP {totalRepayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">만기일</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('due_date')}</p>
                       <p className="font-bold text-rose-500 dark:text-rose-400 text-xs">
                         {req.due_date ? format(new Date(req.due_date), 'yyyy-MM-dd') : '-'}
                       </p>
@@ -847,7 +851,7 @@ export default function Transactions() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-slate-400 uppercase tracking-wider">{isLender ? '빌려준 외상 (채권)' : '빌린 외상 (채무)'}</span>
+                          <span className="text-xs font-black text-slate-400 uppercase tracking-wider">{isLender ? t('lent_credit') : t('borrowed_debt')}</span>
                         </div>
                         <h3 className="font-black text-lg dark:text-white mt-0.5">
                           {isLender ? loan.borrower?.full_name : loan.lender?.full_name}
@@ -866,19 +870,19 @@ export default function Transactions() {
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
                     <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">원금</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t('principal')}</p>
                       <p className="font-extrabold text-slate-800 dark:text-slate-200">PHP {Number(loan.amount).toLocaleString()}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">이자율</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t('interest_rate_label')}</p>
                       <p className="font-extrabold text-blue-600 dark:text-blue-400">{loan.interest_rate || 0}%</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">만기 시 상환액</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t('repayment_amount')}</p>
                       <p className="font-black text-slate-900 dark:text-white">PHP {totalRepayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">만기일</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t('due_date')}</p>
                       <p className="font-extrabold text-rose-500 dark:text-rose-400">
                         {loan.due_date ? format(new Date(loan.due_date), 'yyyy-MM-dd') : '-'}
                       </p>
@@ -1699,7 +1703,7 @@ export default function Transactions() {
                     className="flex-1 h-12 rounded-xl border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300 font-extrabold text-xs flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
-                    지캐시 앱 바로가기
+                    {t('go_to_gcash_app')}
                   </Button>
                 </div>
               </>
@@ -1707,7 +1711,7 @@ export default function Transactions() {
               <>
                 {/* Coin Selection (USDT vs USDC) */}
                 <div className="space-y-2">
-                  <Label className="font-black text-[10px] uppercase tracking-wider text-slate-400 px-1">코인 종류 선택</Label>
+                  <Label className="font-black text-[10px] uppercase tracking-wider text-slate-400 px-1">{t('select_coin_type')}</Label>
                   <div className="flex border border-slate-200 dark:border-white/10 rounded-xl p-1 bg-slate-50 dark:bg-white/5 w-full shrink-0">
                     <button
                       type="button"
@@ -1729,11 +1733,11 @@ export default function Transactions() {
                 {/* Coin Lender Account Details */}
                 <div className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5 space-y-2.5 text-xs">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-slate-400">채권자 이름:</span>
+                    <span className="font-bold text-slate-400">{t('lender_name')}:</span>
                     <span className="font-extrabold text-slate-800 dark:text-slate-100">{payingLoan?.lender?.full_name || '-'}</span>
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <span className="font-bold text-slate-400">입금할 채권자 지갑 주소:</span>
+                    <span className="font-bold text-slate-400">{t('lender_wallet_address')}:</span>
                     <div className="flex items-center justify-between gap-2 p-2 bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/5">
                       <span className="font-mono text-[10px] break-all select-all text-slate-700 dark:text-slate-300 w-[80%] leading-relaxed">
                         {payingLoan?.lender?.solana_wallet || '지갑 주소가 미등록 상태입니다'}
@@ -1749,7 +1753,7 @@ export default function Transactions() {
                             toast.success('채권자 지갑 주소가 복사되었습니다.');
                           }}
                         >
-                          복사
+                          {t('copy')}
                         </Button>
                       )}
                     </div>
@@ -1759,13 +1763,13 @@ export default function Transactions() {
                 {/* Sender Wallet Address Input */}
                 <div className="space-y-2">
                   <Label className="font-black text-[10px] uppercase tracking-wider text-slate-400 px-1">
-                    송금 시 사용한 본인의 지갑/거래소 주소
+                    {t('my_solana_wallet_label')}
                   </Label>
                   <Input 
                     type="text"
                     value={walletAddress}
                     onChange={(e) => setWalletAddress(e.target.value)}
-                    placeholder="예: 0x... 또는 솔라나 주소 (본인 출금지 주소)"
+                    placeholder={t('my_solana_wallet_placeholder')}
                     className="h-12 rounded-xl bg-slate-50 dark:bg-white/5 border-none font-bold text-xs focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -1775,13 +1779,13 @@ export default function Transactions() {
             <div className="border-t border-dashed border-slate-200 dark:border-white/5 my-4 pt-4 space-y-4">
               {/* Screenshot Upload Box */}
               <div className="space-y-2">
-                <Label className="font-black text-[10px] uppercase tracking-wider text-slate-400 px-1">송금 완료 영수증 첨부</Label>
+                <Label className="font-black text-[10px] uppercase tracking-wider text-slate-400 px-1">{t('attach_receipt')}</Label>
                 <div className="aspect-[16/10] w-full bg-slate-50 dark:bg-white/5 rounded-2xl border-2 border-dashed border-slate-200 dark:border-white/10 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 transition-all relative overflow-hidden group">
                   {proofPreview ? (
                     <>
                       <img src={proofPreview} alt="Screenshot Preview" className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-black transition-opacity">
-                        이미지 교체하기
+                        {t('select_image_btn')}
                       </div>
                     </>
                   ) : (
@@ -1789,7 +1793,7 @@ export default function Transactions() {
                       <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center group-hover:scale-105 transition-transform border border-slate-100 dark:border-white/5">
                         <Camera className="w-5 h-5 text-blue-600" />
                       </div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wide">스크린샷 이미지 업로드</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wide">{t('upload_proof_btn')}</span>
                     </>
                   )}
                   <input 
@@ -1810,12 +1814,12 @@ export default function Transactions() {
               {paymentMethod === 'gcash' && (
                 /* Reference ID input */
                 <div className="space-y-2">
-                  <Label className="font-black text-[10px] uppercase tracking-wider text-slate-400 px-1">지캐시 참조 번호 (Reference ID)</Label>
+                  <Label className="font-black text-[10px] uppercase tracking-wider text-slate-400 px-1">{t('gcash_ref')} (Reference ID)</Label>
                   <Input 
                     type="text"
                     value={gcashReference}
                     onChange={(e) => setGcashReference(e.target.value)}
-                    placeholder="송금 후 받은 8자리 이상의 참조 번호"
+                    placeholder={t('gcash_ref')}
                     className="h-12 rounded-xl bg-slate-50 dark:bg-white/5 border-none font-bold text-xs focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -1823,7 +1827,7 @@ export default function Transactions() {
 
               {/* Amount input */}
               <div className="space-y-2">
-                <Label className="font-black text-[10px] uppercase tracking-wider text-slate-400 px-1">실제 입금액 (PHP)</Label>
+                <Label className="font-black text-[10px] uppercase tracking-wider text-slate-400 px-1">{t('actual_amount')} (PHP)</Label>
                 <Input 
                   type="number"
                   value={amountClaimed}
@@ -1835,7 +1839,7 @@ export default function Transactions() {
 
               {/* Time input */}
               <div className="space-y-2">
-                <Label className="font-black text-[10px] uppercase tracking-wider text-slate-400 px-1">실제 입금 완료 일시</Label>
+                <Label className="font-black text-[10px] uppercase tracking-wider text-slate-400 px-1">{t('actual_time')}</Label>
                 <Input 
                   type="datetime-local"
                   value={depositedAt}
