@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Card } from '@/components/ui/card';
-import { Package, TrendingUp, ShoppingCart, PlusCircle, ArrowDownToLine, History } from 'lucide-react';
+import { Package, TrendingUp, ShoppingCart, PlusCircle, ArrowDownToLine, History, ClipboardList } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function InventoryDashboard() {
@@ -86,6 +86,14 @@ export default function InventoryDashboard() {
       href: "/inventory/register",
       color: "bg-purple-500",
       shadow: "shadow-purple-500/20"
+    },
+    {
+      title: t('stock_list'),
+      desc: t('stock_list_desc'),
+      icon: <ClipboardList className="w-8 h-8" />,
+      href: "/inventory/stock",
+      color: "bg-orange-500",
+      shadow: "shadow-orange-500/20"
     }
   ];
 

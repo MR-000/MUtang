@@ -11,17 +11,8 @@ import { ArrowLeft, ScanBarcode, PackagePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
-const BarcodeScanner = dynamic(() => import('@/components/ui/BarcodeScanner').then(mod => mod.BarcodeScanner), {
-  ssr: false,
-  loading: () => (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center text-white font-black text-lg animate-pulse">
-      카메라 스캐너 로딩 중...
-    </div>
-  )
-});
-
 export default function RegisterProductPage() {
-  const { user } = useAuth();
+  const { user, t } = useAuth();
   const router = useRouter();
   const [isScanning, setIsScanning] = useState(false);
   const [barcode, setBarcode] = useState('');
@@ -29,10 +20,22 @@ export default function RegisterProductPage() {
   const [price, setPrice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const BarcodeScanner = dynamic(
+    () => import('@/components/ui/BarcodeScanner').then(mod => mod.BarcodeScanner),
+    {
+      ssr: false,
+      loading: () => (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center text-white font-black text-lg animate-pulse">
+          {t('camera_scanner_loading')}
+        </div>
+      )
+    }
+  );
+
   const handleScan = (code: string) => {
     setBarcode(code);
     setIsScanning(false);
-    toast.success("바코드가 스캔되었습니다.");
+    toast.success(t('barcode_scanned'));
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -41,7 +44,6 @@ export default function RegisterProductPage() {
 
     setIsSubmitting(true);
     try {
-      // Use existing 'inventory' table, repurposing 'sku' for barcode
       const { error } = await supabase
         .from('inventory')
         .insert([{
@@ -49,17 +51,17 @@ export default function RegisterProductPage() {
           sku: barcode,
           name: name,
           price: parseFloat(price),
-          stock: 0 // Will be managed via logs
+          stock: 0
         }]);
 
       if (error) {
         if (error.code === '23505') {
-          toast.error("이미 등록된 바코드입니다.");
+          toast.error(t('duplicate_barcode'));
         } else {
           throw error;
         }
       } else {
-        toast.success("상품이 등록되었습니다.");
+        toast.success(t('product_registered'));
         router.push('/inventory');
       }
     } catch (e: any) {
@@ -72,33 +74,33 @@ export default function RegisterProductPage() {
   return (
     <div className="space-y-6 pb-24 animate-in slide-in-from-right-8 duration-300">
       <header className="flex items-center gap-4">
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => router.back()}
           className="rounded-full w-12 h-12 bg-white dark:bg-white/5 shadow-sm"
         >
           <ArrowLeft className="w-6 h-6" />
         </Button>
-        <h1 className="text-2xl font-black dark:text-white">신규 상품 등록</h1>
+        <h1 className="text-2xl font-black dark:text-white">{t('register_product')}</h1>
       </header>
 
       <form onSubmit={handleSave} className="space-y-6">
         <Card className="p-6 bg-white dark:bg-slate-900 border-none shadow-xl rounded-[32px] space-y-6">
-          
+
           <div className="space-y-3">
             <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">
-              바코드 (필수)
+              {t('barcode_required')}
             </label>
             <div className="flex gap-2">
-              <Input 
-                placeholder="바코드 번호"
+              <Input
+                placeholder={t('barcode_number')}
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
                 required
                 className="h-16 rounded-2xl text-lg font-bold bg-slate-50 dark:bg-white/5 border-none"
               />
-              <Button 
+              <Button
                 type="button"
                 onClick={() => setIsScanning(true)}
                 className="h-16 w-16 shrink-0 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-600 rounded-2xl p-0"
@@ -110,10 +112,10 @@ export default function RegisterProductPage() {
 
           <div className="space-y-3">
             <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">
-              상품명
+              {t('product_name_label')}
             </label>
-            <Input 
-              placeholder="예: 코카콜라 500ml"
+            <Input
+              placeholder={t('product_name_ex')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -123,9 +125,9 @@ export default function RegisterProductPage() {
 
           <div className="space-y-3">
             <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">
-              판매 가격 (₱)
+              {t('sale_price_label')}
             </label>
-            <Input 
+            <Input
               type="number"
               placeholder="0.00"
               value={price}
@@ -137,18 +139,18 @@ export default function RegisterProductPage() {
 
         </Card>
 
-        <Button 
-          type="submit" 
+        <Button
+          type="submit"
           disabled={isSubmitting || !barcode || !name || !price}
           className="w-full h-16 bg-purple-600 hover:bg-purple-700 text-white rounded-[24px] font-black text-xl shadow-xl shadow-purple-500/30 flex items-center gap-2"
         >
           <PackagePlus className="w-6 h-6" />
-          {isSubmitting ? "저장 중..." : "상품 등록 완료"}
+          {isSubmitting ? t('saving_product') : t('save_product')}
         </Button>
       </form>
 
       {isScanning && (
-        <BarcodeScanner 
+        <BarcodeScanner
           onScan={handleScan}
           onClose={() => setIsScanning(false)}
         />
