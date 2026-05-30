@@ -210,6 +210,17 @@ export const translations: Dictionary = {
   register_new_product_desc: { en: 'Register a new barcode and its price.', tl: 'Magrehistro ng bagong barcode at presyo nito.', ko: '새로운 바코드와 가격을 등록합니다.', zh: '注册新条码及其价格。', ja: '新しいバーコードと価格を登録します。' },
   search_users_placeholder: { en: 'Search by name, store, or amount', tl: 'Maghanap sa pangalan, tindahan, o halaga', ko: '이름, 가게명 또는 금액 검색', zh: '按姓名、店铺或金额搜索', ja: '名前、店舗、または金額で検索' },
   transaction_description_label: { en: 'Transaction Description', tl: 'Deskripsyon ng Transaksyon', ko: '거래 설명', zh: '交易描述', ja: '取引説明' },
-  overdue_rules_label: { en: 'Overdue Rules', tl: 'Mga Patakaran sa Overdue', ko: '미납 시 규정', zh: '逾期规则', ja: '未払い規約' }
+  overdue_rules_label: { en: 'Overdue Rules', tl: 'Mga Patakaran sa Overdue', ko: '미납 시 규정', zh: '逾期规则', ja: '未払い規約' },
+  bulk_desc_1: { en: "Bulk order of drinks and snacks for Sari-Sari store inventory", tl: "Bultuhang order ng inumin at meryenda para sa imbentaryo ng Sari-Sari store", ko: "사리사리 상점 음료수 및 스낵 재고 대량 주문 목적", zh: "萨里萨里商店饮料和零食库存的大量订单", ja: "サリサリ店の飲料およびスナックの在庫の大量注文" },
+  bulk_desc_2: { en: "Bulk wholesale purchase of flour and butter for Manila Bakery", tl: "Bultuhang pakyaw na pagbili ng harina at mantikilya para sa Manila Bakery", ko: "마닐라 베이커리 밀가루 및 버터 대량 도매 구매", zh: "马尼拉面包店面粉和黄油的大宗批发采购", ja: "マニラベーカリーの小麦粉とバターの大量卸売購入" },
+  overdue_policy_1: { en: "In case of non-payment within the deadline, a daily overdue fee of 1% is promised.", tl: "Kung sakaling hindi makabayad sa takdang panahon, ipinapangako ang multa na 1% kada araw.", ko: "기한 내 미납 시 일일 1%의 연체료 지불을 약속합니다.", zh: "如逾期未付，承诺每日支付 1% 的滞纳金。", ja: "期限内に支払われない場合、毎日1%の延滞手数料を支払うことを約束します。" },
+  overdue_policy_2: { en: "I agree that a daily overdue fee of 0.8% will be charged in case of overdue.", tl: "Sumasang-ayon ako na sisingilin ang multa na 0.8% kada araw sakaling ma-overdue.", ko: "연체 시 일일 0.8%의 연체료가 부과됨에 동의합니다.", zh: "同意如逾期将每日收取 0.8% 的滞纳金。", ja: "延滞の場合、毎日0.8%の延滞手数料が課されることに同意します。" },
+  overdue_policy_3: { en: "Charge less than 6% per annum under Philippine legal delay interest rate in case of overdue", tl: "Maniningil ng mas mababa sa 6% kada taon sa ilalim ng legal na interes sa Pilipinas sakaling ma-overdue", ko: "연체 시 필리핀 법정 지연이자율 연 6% 이하 부과", zh: "逾期时收取菲律宾法定延迟利率年 6% 以下", ja: "延滞の場合、フィリピン法定遅延利息年6%以下を課す" },
+  overdue_policy_4: { en: "Daily 1% overdue fee in case of overdue", tl: "Araw-araw na 1% na multa sakaling ma-overdue", ko: "연체 시 매일 1% 연체료 부과", zh: "逾期时每日加收 1% 滞纳金", ja: "延滞の場合、毎日1%의 延滞料が課されます" },
+  month: { en: "Month", tl: "Buwan", ko: "개월", zh: "月", ja: "ヶ月" },
+  months: { en: "Months", tl: "mga Buwan", ko: "개월", zh: "月", ja: "ヶ月" },
+  days: { en: "Days", tl: "Araw", ko: "일", zh: "天", ja: "日" },
+  due_date_adjustable: { en: "Adjustable Due Date", tl: "Maaaring Ayusin ang Takdang Petsa", ko: "기일 조정 가능", zh: "截止日期可调", ja: "期日調整可能" },
+  payment_completed_label: { en: "Payment Completed", tl: "Kumpleto ang Bayad", ko: "결제 완료", zh: "支付已完成", ja: "決済完了" }
 };
 export const getTranslation = (key: string, lang: Language) => { return translations[key]?.[lang] || translations[key]?.['en'] || key; };

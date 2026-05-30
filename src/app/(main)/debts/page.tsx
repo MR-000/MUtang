@@ -75,6 +75,51 @@ interface MatchingRequest {
   };
 }
 
+const getSmartTranslatedText = (text: string | null | undefined, t: any): string => {
+  if (!text) return '';
+  
+  const hardcodedMap: Record<string, string> = {
+    "사리사리 상점 음료수 및 스낵 재고 대량 주문 목적": "bulk_desc_1",
+    "마닐라 베이커리 밀가루 및 버터 대량 도매 구매": "bulk_desc_2",
+    "기한 내 미납 시 일일 1%의 연체료 지불을 약속합니다.": "overdue_policy_1",
+    "연체 시 일일 0.8%의 연체료가 부과됨에 동의합니다.": "overdue_policy_2",
+    "연체 시 필리핀 법정 지연이자율 연 6% 이하 부과": "overdue_policy_3",
+    "연체 시 매일 1% 연체료 부과": "overdue_policy_4",
+    "기한 내 미납 시 일일 1% 연체료 지불을 약속합니다.": "overdue_policy_1"
+  };
+
+  let prefix = '';
+  let mainBody = text;
+  
+  const prefixMatch = text.match(/^(\[[^\]]+\])\s*(.*)$/);
+  if (prefixMatch) {
+    prefix = prefixMatch[1];
+    mainBody = prefixMatch[2];
+    
+    let prefixContent = prefix.slice(1, -1);
+    prefixContent = prefixContent
+      .replace("만기:", t("due_date") + ":")
+      .replace("1개월 이내", "1 " + t("month"))
+      .replace("2개월 이내", "2 " + t("months"))
+      .replace("3개월 이내", "3 " + t("months"))
+      .replace("30일 이내", "30 " + t("days"))
+      .replace("60일 이내", "60 " + t("days"))
+      .replace("90일 이내", "90 " + t("days"))
+      .replace("기일 조정 가능", t("due_date_adjustable"));
+      
+    prefix = `[${prefixContent}] `;
+  }
+
+  const cleanBody = mainBody.trim();
+  if (hardcodedMap[cleanBody]) {
+    mainBody = t(hardcodedMap[cleanBody]);
+  } else {
+    mainBody = t(cleanBody);
+  }
+
+  return prefix + mainBody;
+};
+
 export default function Transactions() {
   const { user, profile, t } = useAuth();
   const [mounted, setMounted] = useState(false);
@@ -818,13 +863,13 @@ export default function Transactions() {
                     {req.description && (
                       <div className="flex gap-1.5 text-[11px]">
                         <span className="font-bold text-slate-400 shrink-0">{t('transaction_description_label')}:</span>
-                        <span className="font-bold text-slate-700 dark:text-slate-300">{req.description}</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-300">{getSmartTranslatedText(req.description, t)}</span>
                       </div>
                     )}
                     {req.overdue_policy && (
                       <div className="flex gap-1.5 text-[11px]">
                         <span className="font-bold text-rose-400/80 shrink-0">{t('overdue_rules_label')}:</span>
-                        <span className="font-bold text-rose-600 dark:text-rose-400">{req.overdue_policy}</span>
+                        <span className="font-bold text-rose-600 dark:text-rose-400">{getSmartTranslatedText(req.overdue_policy, t)}</span>
                       </div>
                     )}
                   </div>
@@ -892,19 +937,19 @@ export default function Transactions() {
                   <div className="space-y-1.5 px-1">
                     {loan.description && (
                       <div className="flex gap-2 text-xs">
-                        <span className="font-bold text-slate-400 shrink-0">거래 설명:</span>
-                        <span className="font-bold text-slate-700 dark:text-slate-300">{loan.description}</span>
+                        <span className="font-bold text-slate-400 shrink-0">{t('transaction_description_label')}:</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-300">{getSmartTranslatedText(loan.description, t)}</span>
                       </div>
                     )}
                     {loan.overdue_policy && (
                       <div className="flex gap-2 text-xs">
-                        <span className="font-bold text-rose-400/80 shrink-0">미납 시 규정:</span>
-                        <span className="font-bold text-rose-600 dark:text-rose-400">{loan.overdue_policy}</span>
+                        <span className="font-bold text-rose-400/80 shrink-0">{t('overdue_rules_label')}:</span>
+                        <span className="font-bold text-rose-600 dark:text-rose-400">{getSmartTranslatedText(loan.overdue_policy, t)}</span>
                       </div>
                     )}
                     {loan.status === 'paid' && loan.paid_at && (
                       <div className="flex gap-2 text-xs mt-2 pt-2 border-t border-dashed border-emerald-200 dark:border-emerald-800">
-                        <span className="font-bold text-emerald-500 shrink-0">결제 완료:</span>
+                        <span className="font-bold text-emerald-500 shrink-0">{t('payment_completed_label') || t('paid')}:</span>
                         <span className="font-bold text-emerald-700 dark:text-emerald-400">
                           {format(new Date(loan.paid_at), 'yyyy-MM-dd HH:mm')} | {loan.payment_method?.toUpperCase()} | Ref: {loan.payment_reference}
                         </span>
