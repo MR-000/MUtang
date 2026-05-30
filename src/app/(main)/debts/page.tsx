@@ -723,7 +723,7 @@ export default function Transactions() {
                 className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-blue-600 dark:hover:bg-blue-600 dark:hover:text-white transition-colors rounded-xl font-black h-9 text-xs shadow-sm active:scale-[0.98] mt-0.5"
               >
                 <Plus className="w-4 h-4 mr-0.5" />
-                {matchingType === 'borrower' ? '외상 요청 공고 등록하기' : '외상 제공 공고 등록하기'}
+                {matchingType === 'borrower' ? '대출 요청 공고 등록하기' : '대출 제공 공고 등록하기'}
               </Button>
 
               {/* Sorting Chips */}
@@ -964,8 +964,8 @@ export default function Transactions() {
                             <Clock className="w-4 h-4 mt-0.5 shrink-0" />
                             <div className="text-[11px] font-bold">
                               {isLender 
-                                ? '채무자가 송금 완료 영수증을 업로드했습니다. 정보가 올바른지 대조 후 [입금 확정 승인]을 눌러주세요. 1시간 이내 무응답 시 자동 승인됩니다.' 
-                                : '송금 완료 후 승인 대기 상태입니다. 채권자 무응답 시 1시간 뒤 시스템에서 자동 승인 및 상환 확정 처리됩니다.'}
+                                ? '채무자가 송금 후 영수증을 업로드했습니다. 정보가 올바른지 대조 후 승인을 눌러주세요. 1시간 이내 무응답 시 자동 승인됩니다.' 
+                                : '송금 완료 후 승인 대기중입니다. 채권자가 1시간 이내 시스템에서 자동 승인 및 상환 확정 처리합니다.'}
                               <p className="mt-1 text-[10px] text-amber-500/80 font-black">
                                 자동 승인 예정: {format(new Date(latestProof.auto_confirm_deadline), 'yyyy-MM-dd HH:mm')}
                               </p>
@@ -977,8 +977,7 @@ export default function Transactions() {
                           <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-500/5 border border-rose-500/10 text-rose-600 dark:text-rose-400">
                             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                             <div className="text-[11px] font-bold">
-                              ?↔툑 利앸튃??嫄곗젅?섏뿀?듬땲?? ?곸닔利??대?吏? ?낅젰 ?뺣낫瑜??ㅼ떆 ?쒕쾲 ?議고븯???щ컮瑜닿쾶 ?ㅼ떆 ?곹솚???쒕룄??二쇱꽭??
-                              승인이 거절되었습니다. 영수증 이미지와 입력 정보를 다시 한번 대조하고 올바르게 다시 상환을 시도해주세요.
+                              송금 증빙이 거절되었습니다. 영수증 이미지와 입력 정보를 다시 한번 대조하여 올바르게 다시 상환을 시도해 주세요.
                             </div>
                           </div>
                         )}
@@ -994,7 +993,7 @@ export default function Transactions() {
                                 onClick={() => window.open(latestProof.screenshot_url, '_blank')}
                               />
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-black transition-opacity">
-                                ?ш쾶 蹂닿린
+                                크게 보기
                               </div>
                             </div>
                           </div>
@@ -1440,35 +1439,35 @@ export default function Transactions() {
                         if (value > 6) {
                           isViolated = true;
                           break;
-                    법적 지연이자 제한 안내: 필리핀 민법 및 중앙은행 규정에 의거하여 기한 후 미납 시 청구하는 지연이율은 법정 상한선인 연 6%를 초과할 수 없습니다.
+                        }
                       }
                       
                       if (isViolated) {
                         return (
                           <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-900/30 rounded-xl text-red-600 dark:text-red-400 flex items-start gap-2 animate-in slide-in-from-top-1 duration-200">
                             <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">만기 기일 설정 방식</Label>
+                            <span className="text-[10px] font-bold leading-normal">
                               규정 위반 감지: 법적 미납 지연이율은 연 6%를 초과할 수 없습니다. 계약의 안전을 위해 6% 이하로 조정해 주세요.
                             </span>
                           </div>
                         );
                       }
                       return null;
-                    기간 선택 및 기일 조정
+                    })()}
                   </div>
                 )}
                 <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/30 rounded-xl text-blue-600 dark:text-blue-400 flex items-start gap-2 animate-in fade-in duration-300">
                   <ShieldCheck className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <span className="text-[10px] font-bold leading-normal">
                     법적 지연이자 제한 안내: 필리핀 민법 및 중앙은행 규정에 의거하여 기한 후 미납 시 청구하는 지연이율은 법정 상한선인 연 6%를 초과할 수 없습니다.
-                    특정 날짜 지정
+                  </span>
                 </div>
               </div>
 
               {/* 留뚭린 湲곗씪 ?ㅼ젙 諛⑹떇 */}
               <div className="space-y-3">
                 <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">만기 기일 설정 방식</Label>
-                    <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">만기 기간 선택</Label>
+                <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl">
                   <button 
                     type="button"
                     onClick={() => setDueDateType('period')}
@@ -1501,7 +1500,7 @@ export default function Transactions() {
                             <SelectItem key={i + 1} value={(i + 1).toString()} className="font-bold">
                               {i + 1}일
                             </SelectItem>
-                        placeholder="만기 일수를 입력하세요 (예: 15)"
+                          ))}
                         </SelectGroup>
                         <SelectSeparator />
                         <SelectGroup>
@@ -1532,7 +1531,7 @@ export default function Transactions() {
                 <div className="space-y-3 animate-in fade-in duration-300">
                   <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('due_date')}</Label>
                   <div className="relative">
-                  기일 조정 가능 (상호 합의 하에 기일 조율 가능)
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
                     <Input 
                       type="date"
                       value={dueDate}
@@ -1554,14 +1553,14 @@ export default function Transactions() {
                 />
                 <label htmlFor="isAdjustable" className="text-sm font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
                   기일 조정 가능 (상호 합의 하에 기일 조율 가능)
-              취소
+                </label>
               </div>
 
               <div className="space-y-3">
                 <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('description')}</Label>
                 <Input 
                   value={description}
-              {isSubmitting ? '등록 중...' : '공고 등록하기'}
+                  onChange={(e) => setDescription(e.target.value)}
                   placeholder="공고에 대한 설명과 상세 목적을 입력해 보세요."
                   className="h-16 rounded-2xl bg-slate-50 dark:bg-white/5 border-none font-bold focus:ring-2 focus:ring-blue-500"
                 />
@@ -1577,7 +1576,7 @@ export default function Transactions() {
             >
               취소
             </Button>
-              상환 결제 및 증빙 제출
+            <Button 
               onClick={handleCreatePost}
               disabled={!amount || isSubmitting}
               className="flex-1 h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-[24px] font-black text-xl shadow-2xl shadow-blue-500/40 active:scale-95 transition-all"
@@ -1588,14 +1587,14 @@ export default function Transactions() {
         </DialogContent>
       </Dialog>
 
-              GCash 상환
+      {/* GCash & Coin Payment Dialog */}
       <Dialog open={isPaymentOpen} onOpenChange={(open) => {
         if (!isUploadingProof) {
           setIsPaymentOpen(open);
           if (!open) { resetGCashPaymentForm(); }
         }
       }}>
-              USDT / USDC 코인 상환
+        <DialogContent className="max-w-md w-[95%] rounded-[32px] dark:bg-slate-950 dark:border-white/5 px-5 pt-7 pb-7 outline-none flex flex-col max-h-[85vh] overflow-y-auto">
           <DialogHeader className="shrink-0">
             <DialogTitle className="text-xl font-black dark:text-white text-center">
               상환 결제 및 증빙 제출
@@ -1605,14 +1604,14 @@ export default function Transactions() {
           {/* Payment Method Tabs */}
           <div className="flex border border-slate-200 dark:border-white/10 rounded-xl p-1 bg-slate-50 dark:bg-white/5 w-full shrink-0 my-2">
             <button
-                    <span className="font-bold text-slate-400">채권자 이름:</span>
+              type="button"
               onClick={() => setPaymentMethod('gcash')}
               className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${paymentMethod === 'gcash' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
             >
-                    <span className="font-bold text-slate-400">GCash 송금 번호:</span>
+              GCash 상환
             </button>
             <button
-                        {payingLoan?.lender?.gcash_number || payingLoan?.lender?.phone || '등록된 번호 없음'}
+              type="button"
               onClick={() => setPaymentMethod('coin')}
               className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${paymentMethod === 'coin' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
             >
@@ -1623,10 +1622,10 @@ export default function Transactions() {
           <div className="space-y-5 py-3 flex-1">
             {paymentMethod === 'gcash' ? (
               <>
-                            toast.success('전화번호가 복사되었습니다.');
+                {/* GCash Lender Account Details */}
                 <div className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5 space-y-2.5 text-xs">
                   <div className="flex justify-between items-center">
-                          복사
+                    <span className="font-bold text-slate-400">채권자 이름:</span>
                     <span className="font-extrabold text-slate-800 dark:text-slate-100">{payingLoan?.lender?.full_name || '-'}</span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -1636,7 +1635,7 @@ export default function Transactions() {
                         {payingLoan?.lender?.gcash_number || payingLoan?.lender?.phone || '등록된 번호 없음'}
                       </span>
                       {(payingLoan?.lender?.gcash_number || payingLoan?.lender?.phone) && (
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">채권자 GCash QR 코드</span>
+                        <Button 
                           variant="ghost" 
                           size="sm" 
                           type="button"
@@ -1760,13 +1759,13 @@ export default function Transactions() {
                 {/* Sender Wallet Address Input */}
                 <div className="space-y-2">
                   <Label className="font-black text-[10px] uppercase tracking-wider text-slate-400 px-1">
-                    ?↔툑???ъ슜??蹂몄씤??吏媛?嫄곕옒??二쇱냼
+                    송금 시 사용한 본인의 지갑/거래소 주소
                   </Label>
                   <Input 
                     type="text"
                     value={walletAddress}
                     onChange={(e) => setWalletAddress(e.target.value)}
-                    placeholder="?? 0x... ?먮뒗 ?붾씪??二쇱냼 (蹂몄씤 ?낆텧湲?二쇱냼)"
+                    placeholder="예: 0x... 또는 솔라나 주소 (본인 출금지 주소)"
                     className="h-12 rounded-xl bg-slate-50 dark:bg-white/5 border-none font-bold text-xs focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -1811,12 +1810,12 @@ export default function Transactions() {
               {paymentMethod === 'gcash' && (
                 /* Reference ID input */
                 <div className="space-y-2">
-                  <Label className="font-black text-[10px] uppercase tracking-wider text-slate-400 px-1">吏罹먯떆 李몄“ 踰덊샇 (Reference ID)</Label>
+                  <Label className="font-black text-[10px] uppercase tracking-wider text-slate-400 px-1">지캐시 참조 번호 (Reference ID)</Label>
                   <Input 
                     type="text"
                     value={gcashReference}
                     onChange={(e) => setGcashReference(e.target.value)}
-                    placeholder="?↔툑 ??諛쏆? 8?먮━ ?댁긽??李몄“ 踰덊샇"
+                    placeholder="송금 후 받은 8자리 이상의 참조 번호"
                     className="h-12 rounded-xl bg-slate-50 dark:bg-white/5 border-none font-bold text-xs focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
