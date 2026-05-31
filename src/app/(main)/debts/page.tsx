@@ -691,7 +691,7 @@ export default function Transactions() {
       setCustomPolicy(policyKey);
     }
 
-    setDescription(req.description || '');
+    setDescription(getSmartTranslatedText(req.description, t) || '');
     setDueDate(req.due_date || '');
     setTxStep(1);
     setIsTransactionOpen(true);

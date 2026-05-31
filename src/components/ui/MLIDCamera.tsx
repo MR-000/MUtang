@@ -192,7 +192,7 @@ export default function MLIDCamera({ mode, onCapture, onClose, t }: MLIDCameraPr
       </div>
 
       {/* Footer Controls Overlay */}
-      <div className="bg-slate-950 px-6 py-10 flex items-center justify-between z-30 border-t border-white/5 shrink-0">
+      <div className="bg-slate-950 px-6 pt-6 pb-24 flex items-center justify-between z-30 border-t border-white/5 shrink-0">
         <div className="w-16"></div> {/* Spacer to center the capture button */}
         
         <button
