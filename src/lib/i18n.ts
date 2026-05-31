@@ -373,6 +373,7 @@ export const translations: Dictionary = {
   one_month: { en: "1 Month", tl: "1 Buwan", ko: "한 달 (최근 30일)", zh: "1 个月", ja: "1 ヶ月" },
   total_sales: { en: "Total Sales", tl: "Kabuuang Benta", ko: "총 매출액", zh: "总销售额", ja: "総売上額" },
   total_purchases: { en: "Total Purchases", tl: "Kabuuang Bili", ko: "총 매입액", zh: "总进货额", ja: "総仕入れ額" },
-  net_profit: { en: "Net Profit", tl: "Netong Kita", ko: "순수익", zh: "净利润", ja: "純利益" }
+  net_profit: { en: "Net Profit", tl: "Netong Kita", ko: "순수익", zh: "净利润", ja: "純利益" },
+  due_date_period_select: { en: "Select Due Period", tl: "Pumili ng Takdang Panahon", ko: "만기 기간 선택", zh: "选择截止期限", ja: "返済期間選択" }
 };
 export const getTranslation = (key: string, lang: Language) => { return translations[key]?.[lang] || translations[key]?.['en'] || key; };

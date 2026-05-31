@@ -86,7 +86,9 @@ const getSmartTranslatedText = (text: string | null | undefined, t: any): string
     "연체 시 일일 0.8%의 연체료가 부과됨에 동의합니다.": "overdue_policy_2",
     "연체 시 필리핀 법정 지연이자율 연 6% 이하 부과": "overdue_policy_3",
     "연체 시 매일 1% 연체료 부과": "overdue_policy_4",
-    "기한 내 미납 시 일일 1% 연체료 지불을 약속합니다.": "overdue_policy_1"
+    "기한 내 미납 시 일일 1% 연체료 지불을 약속합니다.": "overdue_policy_1",
+    "연체 시 연 5% 지연이자율 적용": "overdue_policy_5",
+    "연체 시 연 24% 법정 지연손해금 적용": "overdue_policy_6"
   };
 
   let prefix = '';
@@ -403,8 +405,8 @@ export default function Transactions() {
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [interestRate, setInterestRate] = useState('0');
-  const [overduePolicy, setOverduePolicy] = useState('연체 시 필리핀 법정 지연이자율 연 6% 이하 부과');
-  const [policyType, setPolicyType] = useState('1');
+  const [overduePolicy, setOverduePolicy] = useState('overdue_policy_3');
+  const [policyType, setPolicyType] = useState('overdue_policy_3');
   const [customPolicy, setCustomPolicy] = useState('');
   const [lenderSignature, setLenderSignature] = useState<string | null>(null);
   const [borrowerSignature, setBorrowerSignature] = useState<string | null>(null);
@@ -500,8 +502,8 @@ export default function Transactions() {
     setDescription('');
     setDueDate('');
     setInterestRate('0');
-    setOverduePolicy('연체 시 필리핀 법정 지연이자율 연 6% 이하 부과');
-    setPolicyType('1');
+    setOverduePolicy('overdue_policy_3');
+    setPolicyType('overdue_policy_3');
     setCustomPolicy('');
     setLenderSignature(null);
     setBorrowerSignature(null);
@@ -536,11 +538,35 @@ export default function Transactions() {
     setSelectedRequest(req);
     setAmount(req.amount.toString());
     setInterestRate((req.interest_rate || 0).toString());
-    setOverduePolicy(req.overdue_policy || '연체 시 매일 1% 연체료 부과');
+    
+    const rawPolicy = req.overdue_policy || 'overdue_policy_3';
+    const hardcodedMap: Record<string, string> = {
+      "기한 내 미납 시 일일 1%의 연체료 지불을 약속합니다.": "overdue_policy_1",
+      "연체 시 일일 0.8%의 연체료가 부과됨에 동의합니다.": "overdue_policy_2",
+      "연체 시 필리핀 법정 지연이자율 연 6% 이하 부과": "overdue_policy_3",
+      "연체 시 매일 1% 연체료 부과": "overdue_policy_4",
+      "기한 내 미납 시 일일 1% 연체료 지불을 약속합니다.": "overdue_policy_1",
+      "연체 시 연 5% 지연이자율 적용": "overdue_policy_5",
+      "연체 시 연 24% 법정 지연손해금 적용": "overdue_policy_6"
+    };
+
+    let policyKey = rawPolicy;
+    if (hardcodedMap[rawPolicy]) {
+      policyKey = hardcodedMap[rawPolicy];
+    }
+
+    setOverduePolicy(policyKey);
+
+    if (['overdue_policy_3', 'overdue_policy_4', 'overdue_policy_5', 'overdue_policy_6'].includes(policyKey)) {
+      setPolicyType(policyKey);
+      setCustomPolicy('');
+    } else {
+      setPolicyType('custom');
+      setCustomPolicy(policyKey);
+    }
+
     setDescription(req.description || '');
     setDueDate(req.due_date || '');
-    setPolicyType(req.overdue_policy ? 'custom' : '1');
-    setCustomPolicy(req.overdue_policy || '');
     setTxStep(1);
     setIsTransactionOpen(true);
   };
@@ -1445,23 +1471,18 @@ export default function Transactions() {
                     <Select value={policyType} onValueChange={(value) => {
                       setPolicyType(value);
                       if (value !== 'custom') {
-                        const matched = [
-                          { id: '1', text: '연체 시 매일 1% 연체료 부과' },
-                          { id: '2', text: '연체 시 연 5% 지연이자율 적용' },
-                          { id: '3', text: '연체 시 연 24% 법정 지연손해금 적용' }
-                        ].find(p => p.id === value);
-                        if (matched) setOverduePolicy(matched.text);
+                        setOverduePolicy(value);
                       } else {
-                        setOverduePolicy(customPolicy || '직접 입력한 규정');
+                        setOverduePolicy(customPolicy || 'custom');
                       }
                     }}>
                       <SelectTrigger className="h-16 rounded-2xl bg-slate-50 dark:bg-white/5 border-none font-bold focus:ring-2 focus:ring-blue-500">
                         <SelectValue placeholder={t('overdue_policy_placeholder')} />
                       </SelectTrigger>
                       <SelectContent className="rounded-2xl dark:bg-slate-900 border-none shadow-xl">
-                        <SelectItem value="1" className="font-bold">{t('overdue_policy_4')}</SelectItem>
-                        <SelectItem value="2" className="font-bold">{t('overdue_policy_5')}</SelectItem>
-                        <SelectItem value="3" className="font-bold">{t('overdue_policy_6')}</SelectItem>
+                        <SelectItem value="overdue_policy_4" className="font-bold">{t('overdue_policy_4')}</SelectItem>
+                        <SelectItem value="overdue_policy_5" className="font-bold">{t('overdue_policy_5')}</SelectItem>
+                        <SelectItem value="overdue_policy_6" className="font-bold">{t('overdue_policy_6')}</SelectItem>
                         <SelectItem value="custom" className="font-bold">{t('custom')}</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1853,12 +1874,7 @@ export default function Transactions() {
                 <Select value={policyType} onValueChange={(value) => {
                   setPolicyType(value);
                   if (value !== 'custom') {
-                    const matched = [
-                      { id: '1', text: 'overdue_legal_warning' },
-                      { id: '2', text: 'overdue_policy_option_2' },
-                      { id: '3', text: 'overdue_policy_option_3' }
-                    ].find(p => p.id === value);
-                    if (matched) setOverduePolicy(matched.text);
+                    setOverduePolicy(value);
                   } else {
                     setOverduePolicy(customPolicy || 'custom');
                   }
@@ -1867,9 +1883,9 @@ export default function Transactions() {
                     <SelectValue placeholder={t('overdue_policy_placeholder')} />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl dark:bg-slate-900 border-none shadow-xl">
-                    <SelectItem value="1" className="font-bold">{t('overdue_legal_warning')}</SelectItem>
-                    <SelectItem value="2" className="font-bold">{t('overdue_policy_option_2') || 'overdue_policy_option_2'}</SelectItem>
-                    <SelectItem value="3" className="font-bold">{t('overdue_policy_option_3') || 'overdue_policy_option_3'}</SelectItem>
+                    <SelectItem value="overdue_policy_3" className="font-bold">{t('overdue_policy_3')}</SelectItem>
+                    <SelectItem value="overdue_policy_5" className="font-bold">{t('overdue_policy_5')}</SelectItem>
+                    <SelectItem value="overdue_policy_6" className="font-bold">{t('overdue_policy_6')}</SelectItem>
                     <SelectItem value="custom" className="font-bold">{t('custom') || 'custom'}</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1918,23 +1934,23 @@ export default function Transactions() {
                 </div>
               </div>
 
-              {/* 留뚭린 湲곗씪 ?ㅼ젙 諛⑹떇 */}
+              {/* 만기 기일 설정 방식 */}
               <div className="space-y-3">
-                <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">만기 기일 설정 방식</Label>
+                <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('due_date_adjustable_title')}</Label>
                 <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl">
                   <button 
                     type="button"
                     onClick={() => setDueDateType('period')}
                     className={`flex-1 py-3 rounded-xl text-xs font-black transition-all duration-300 ${dueDateType === 'period' ? 'bg-white dark:bg-blue-600 shadow-md text-blue-600 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}
                   >
-                    기간 선택 및 기일 조정
+                    {t('due_date_adjustable_period')}
                   </button>
                   <button 
                     type="button"
                     onClick={() => setDueDateType('fixed')}
                     className={`flex-1 py-3 rounded-xl text-xs font-black transition-all duration-300 ${dueDateType === 'fixed' ? 'bg-white dark:bg-blue-600 shadow-md text-blue-600 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}
                   >
-                    특정 날짜 지정
+                    {t('due_date_adjustable_fixed')}
                   </button>
                 </div>
               </div>
