@@ -1841,7 +1841,7 @@ export default function Transactions() {
               <div className="space-y-3">
                 <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('repayment_amount_due')}</Label>
                 <div className="h-20 flex flex-col justify-center px-5 rounded-2xl bg-blue-500/10 dark:bg-blue-600/20 border border-blue-500/25">
-                  <span className="text-[10px] font-black uppercase tracking-[0.1em] text-blue-600 dark:text-blue-400 mb-0.5">총 상환 금액 (원금 + 이자)</span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.1em] text-blue-600 dark:text-blue-400 mb-0.5">{t('total_repay_amount_desc')}</span>
                   <span className="text-2xl font-black text-blue-700 dark:text-blue-300">
                     {(Number(amount || 0) * (1 + Number(interestRate || 0) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
@@ -1849,28 +1849,28 @@ export default function Transactions() {
               </div>
 
               <div className="space-y-3">
-                <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">기한 후 미납 시 규정 (연체약정)</Label>
+                <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('overdue_policy_label')}</Label>
                 <Select value={policyType} onValueChange={(value) => {
                   setPolicyType(value);
                   if (value !== 'custom') {
                     const matched = [
-                      { id: '1', text: '연체 시 필리핀 법정 지연이자율 연 6% 이하 부과' },
-                      { id: '2', text: '연체 시 법적 최고 제한 연 6% 지연손해금 적용' },
-                      { id: '3', text: '상호 합의에 의해 추가 지연이자 없이 법정 이율 연 6% 적용' }
+                      { id: '1', text: 'overdue_legal_warning' },
+                      { id: '2', text: 'overdue_policy_option_2' },
+                      { id: '3', text: 'overdue_policy_option_3' }
                     ].find(p => p.id === value);
                     if (matched) setOverduePolicy(matched.text);
                   } else {
-                    setOverduePolicy(customPolicy || '직접 입력한 규정');
+                    setOverduePolicy(customPolicy || 'custom');
                   }
                 }}>
                   <SelectTrigger className="h-16 rounded-2xl bg-slate-50 dark:bg-white/5 border-none font-bold focus:ring-2 focus:ring-blue-500">
-                    <SelectValue placeholder="미납 시 규정을 선택하세요" />
+                    <SelectValue placeholder={t('overdue_policy_placeholder')} />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl dark:bg-slate-900 border-none shadow-xl">
-                    <SelectItem value="1" className="font-bold">연체 시 필리핀 법정 지연이자율 연 6% 이하 부과</SelectItem>
-                    <SelectItem value="2" className="font-bold">연체 시 법적 최고 제한 연 6% 지연손해금 적용</SelectItem>
-                    <SelectItem value="3" className="font-bold">상호 합의에 의해 추가 지연이자 없이 법정 이율 연 6% 적용</SelectItem>
-                    <SelectItem value="custom" className="font-bold">직접 입력</SelectItem>
+                    <SelectItem value="1" className="font-bold">{t('overdue_legal_warning')}</SelectItem>
+                    <SelectItem value="2" className="font-bold">{t('overdue_policy_option_2') || 'overdue_policy_option_2'}</SelectItem>
+                    <SelectItem value="3" className="font-bold">{t('overdue_policy_option_3') || 'overdue_policy_option_3'}</SelectItem>
+                    <SelectItem value="custom" className="font-bold">{t('custom') || 'custom'}</SelectItem>
                   </SelectContent>
                 </Select>
                 {policyType === 'custom' && (
@@ -1881,7 +1881,7 @@ export default function Transactions() {
                         setCustomPolicy(e.target.value);
                         setOverduePolicy(e.target.value);
                       }}
-                      placeholder="지연 시 부과할 규정이나 내용을 직접 입력하세요."
+                      placeholder={t('custom_policy_placeholder')}
                       className="h-14 mt-2 rounded-2xl bg-slate-50 dark:bg-white/5 border-none font-bold focus:ring-2 focus:ring-blue-500 animate-in fade-in duration-300"
                     />
                     {(() => {
@@ -1901,7 +1901,7 @@ export default function Transactions() {
                           <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-900/30 rounded-xl text-red-600 dark:text-red-400 flex items-start gap-2 animate-in slide-in-from-top-1 duration-200">
                             <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" />
                             <span className="text-[10px] font-bold leading-normal">
-                              규정 위반 감지: 법적 미납 지연이율은 연 6%를 초과할 수 없습니다. 계약의 안전을 위해 6% 이하로 조정해 주세요.
+                              {t('overdue_policy_error')}
                             </span>
                           </div>
                         );
@@ -1913,7 +1913,7 @@ export default function Transactions() {
                 <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/30 rounded-xl text-blue-600 dark:text-blue-400 flex items-start gap-2 animate-in fade-in duration-300">
                   <ShieldCheck className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <span className="text-[10px] font-bold leading-normal">
-                    법적 지연이자 제한 안내: 필리핀 민법 및 중앙은행 규정에 의거하여 기한 후 미납 시 청구하는 지연이율은 법정 상한선인 연 6%를 초과할 수 없습니다.
+                    {t('overdue_legal_warning')}
                   </span>
                 </div>
               </div>
@@ -1942,30 +1942,30 @@ export default function Transactions() {
               {dueDateType === 'period' ? (
                 <div className="space-y-4 animate-in fade-in duration-300">
                   <div className="space-y-3">
-                    <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">만기 기간 선택</Label>
+                    <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('due_date_period_select') || t('due_date_adjustable_placeholder')}</Label>
                     <Select value={periodValue} onValueChange={setPeriodValue}>
                       <SelectTrigger className="h-16 rounded-2xl bg-slate-50 dark:bg-white/5 border-none font-bold focus:ring-2 focus:ring-blue-500">
-                        <SelectValue placeholder="만기 기간을 선택하세요" />
+                        <SelectValue placeholder={t('due_date_adjustable_placeholder')} />
                       </SelectTrigger>
                       <SelectContent className="rounded-2xl dark:bg-slate-900 border-none shadow-xl">
                         <SelectGroup>
-                          <SelectLabel className="text-xs text-slate-400">일 단위 선택 (1일 ~ 31일)</SelectLabel>
+                          <SelectLabel className="text-xs text-slate-400">{t('select_days_label')}</SelectLabel>
                           {Array.from({ length: 31 }, (_, i) => (
                             <SelectItem key={i + 1} value={(i + 1).toString()} className="font-bold">
-                              {i + 1}일
+                              {i + 1}{t('days')}
                             </SelectItem>
                           ))}
                         </SelectGroup>
                         <SelectSeparator />
                         <SelectGroup>
-                          <SelectLabel className="text-xs text-slate-400">월 단위 선택</SelectLabel>
-                          <SelectItem value="30" className="font-bold">1개월 (30일)</SelectItem>
-                          <SelectItem value="60" className="font-bold">2개월 (60일)</SelectItem>
-                          <SelectItem value="90" className="font-bold">3개월 (90일)</SelectItem>
+                          <SelectLabel className="text-xs text-slate-400">{t('select_months_label')}</SelectLabel>
+                          <SelectItem value="30" className="font-bold">1{t('month')} (30{t('days')})</SelectItem>
+                          <SelectItem value="60" className="font-bold">2{t('months')} (60{t('days')})</SelectItem>
+                          <SelectItem value="90" className="font-bold">3{t('months')} (90{t('days')})</SelectItem>
                         </SelectGroup>
                         <SelectSeparator />
                         <SelectGroup>
-                          <SelectItem value="custom" className="font-bold text-blue-500">기간 직접 입력 (일 단위)</SelectItem>
+                          <SelectItem value="custom" className="font-bold text-blue-500">{t('custom_period_label')}</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
@@ -1975,7 +1975,7 @@ export default function Transactions() {
                         type="number"
                         value={customPeriodDays}
                         onChange={(e) => setCustomPeriodDays(e.target.value)}
-                        placeholder="만기 일수를 입력하세요 (예: 15)"
+                        placeholder={t('due_date_adjustable_custom_placeholder')}
                         className="h-14 mt-2 rounded-2xl bg-slate-50 dark:bg-white/5 border-none font-bold focus:ring-2 focus:ring-blue-500 animate-in fade-in duration-300"
                       />
                     )}
