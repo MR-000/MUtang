@@ -16,7 +16,7 @@ self.addEventListener('push', function(event) {
 
   const options = {
     body: data.body || data.message,
-    icon: '/icon-192.png',
+    icon: '/android-192.png',
     badge: '/icon-72.png',
     vibrate: [200, 100, 200],
     tag: 'mutang-due-reminder',        // 같은 태그면 덮어씀 (중복 방지)

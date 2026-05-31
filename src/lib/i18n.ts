@@ -338,7 +338,7 @@ export const translations: Dictionary = {
   no_customers: { en: "No customers registered yet.", tl: "Wala pang nakarehistrong customer.", ko: "등록된 고객이 없습니다.", zh: "暂无注册客户。", ja: "登録された顧客はまだいません。" },
   add_customer_hint: { en: "Click the add button above to register your first customer.", tl: "I-click ang button sa itaas para magdagdag.", ko: "상단의 신규 고객 추가 버튼을 클릭해 첫 거래처를 등록하세요.", zh: "点击上方添加按钮注册您的第一个客户。", ja: "上の追加ボタンをクリックして最初の顧客을登録してください。" },
   customer_added: { en: "Customer registered successfully", tl: "Matagumpay na nairehistro ang customer", ko: "고객 정보가 성공적으로 등록되었습니다.", zh: "客户注册成功", ja: "顧客情報が正常に登録されました" },
-  login_title: { en: "LENDER", tl: "LENDER", ko: "LENDER", zh: "LENDER", ja: "LENDER" },
+  login_title: { en: "MUtang", tl: "MUtang", ko: "MUtang", zh: "MUtang", ja: "MUtang" },
   login_subtitle: { en: "Trust-based Agreement Marketplace", tl: "Kasunduan sa Pagitan ng mga User", ko: "신뢰 기반 외상 거래 마켓플레이스", zh: "基于信任的协议市场", ja: "信頼に基づく合意マーケットプレイス" },
   identity_phone_label: { en: "Identity / Phone", tl: "Identidad / Telepono", ko: "신원 / 전화번호", zh: "身份 / 手机号", ja: "身元 / 電話番号" },
   phone_admin_placeholder: { en: "Phone number or Admin ID", tl: "Numero ng telepono o Admin ID", ko: "전화번호 또는 관리자 ID 입력", zh: "输入手机号或管理员 ID", ja: "電話番号または管理者IDを入力" },
