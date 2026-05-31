@@ -54,8 +54,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (savedLang) {
       setLanguageState(savedLang);
     } else {
-      setLanguageState('en');
-      localStorage.setItem('utang_lang', 'en');
+      // 첫 접속 시 브라우저 기본 로케일 감지 및 5대 지원 언어 매핑
+      const browserLang = (typeof navigator !== 'undefined' && navigator.language) 
+        ? navigator.language.split('-')[0].toLowerCase() 
+        : 'en';
+      const supportedLangs: Language[] = ['en', 'tl', 'ko', 'zh', 'ja'];
+      const defaultLang = supportedLangs.includes(browserLang as Language) ? (browserLang as Language) : 'en';
+      setLanguageState(defaultLang);
+      localStorage.setItem('utang_lang', defaultLang);
     }
     if (savedTheme) setThemeState(savedTheme);
 

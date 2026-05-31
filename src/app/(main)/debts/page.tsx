@@ -1770,6 +1770,7 @@ export default function Transactions() {
                         onClick={() => {
                           setActivePhotoId(p.id);
                           setCameraMode('id');
+                          setIsTransactionOpen(false);
                           setIsCameraOpen(true);
                         }}
                         className="aspect-[4/3] bg-slate-50 dark:bg-white/5 rounded-[32px] border-2 border-dashed border-slate-200 dark:border-white/10 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 transition-all relative overflow-hidden group"
@@ -1795,6 +1796,7 @@ export default function Transactions() {
                     onClick={() => {
                       setActivePhotoId('selfie');
                       setCameraMode('selfie');
+                      setIsTransactionOpen(false);
                       setIsCameraOpen(true);
                     }}
                     className="w-full h-28 bg-slate-50 dark:bg-white/5 rounded-[32px] border-2 border-dashed border-slate-200 dark:border-white/10 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 transition-all relative overflow-hidden group"
@@ -2585,9 +2587,13 @@ export default function Transactions() {
           mode={cameraMode}
           onCapture={(file, preview) => {
             setIsCameraOpen(false);
+            setIsTransactionOpen(true);
             processCapturedPhoto(activePhotoId, file, preview);
           }}
-          onClose={() => setIsCameraOpen(false)}
+          onClose={() => {
+            setIsCameraOpen(false);
+            setIsTransactionOpen(true);
+          }}
           t={t}
         />
       )}

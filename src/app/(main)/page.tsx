@@ -239,7 +239,7 @@ export default function Dashboard() {
                 </Link>
               )}
             </div>
-            <h1 className="text-lg font-black tracking-tight">{t('hello')}, {profile?.full_name || t('lender')}</h1>
+            <h1 className="text-lg font-black tracking-tight">{t('hello')}, {profile?.full_name || t('user')}</h1>
             <p className="text-[11px] text-slate-400 font-medium">{t('dashboard_subtitle')}</p>
           </div>
           
