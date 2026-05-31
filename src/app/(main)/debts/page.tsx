@@ -28,7 +28,9 @@ import {
   Info,
   Clock,
   AlertTriangle,
-  QrCode
+  QrCode,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -36,6 +38,7 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { format } from 'date-fns';
+import MLIDCamera from '@/components/ui/MLIDCamera';
 import { SignaturePad } from '@/components/ui/signature-pad';
 import { Card } from '@/components/ui/card';
 import { TierBadge } from '@/components/ui/tier-badge';
@@ -371,18 +374,76 @@ export default function Transactions() {
             </div>
           </div>
         </div>
+
+        {/* 3페이지: 법적 신원 증빙 자료 첨부 (신분증 4장 및 셀피) */}
+        <div style="page-break-before: always; padding-top: 20px;">
+          <div style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">
+            <h1 style="font-size: 16px; font-weight: 900; margin: 0; color: #1e3a8a;">Identity Verification Evidence</h1>
+            <p style="font-size: 8px; color: #64748b; margin: 2px 0 0 0;">Transaction Legal Security Records</p>
+          </div>
+          
+          <p style="font-size: 9px; color: #475569; margin-bottom: 20px; line-height: 1.5; font-weight: bold;">
+            The following documents were securely captured and verified through AI ML Kit scanning during transaction agreement to ensure the legal binding and non-repudiation of both parties.
+          </p>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; margin-bottom: 25px;">
+            ${['front1', 'back1', 'front2', 'back2'].map(key => {
+              const url = loan.verification_evidence?.photos?.[key];
+              const label = key.toUpperCase().replace('FRONT', 'ID Front ').replace('BACK', 'ID Back ');
+              if (!url) return '';
+              return `
+                <div style="text-align: center; width: 130px; border: 1px solid #e2e8f0; padding: 6px; border-radius: 8px; background-color: #ffffff;">
+                  <div style="height: 80px; display: flex; align-items: center; justify-content: center; background-color: #f8fafc; border-radius: 6px; overflow: hidden; margin-bottom: 4px;">
+                    <img src="${url}" style="max-height: 80px; max-width: 100%; object-fit: cover;" crossorigin="anonymous" />
+                  </div>
+                  <span style="font-size: 7px; font-weight: bold; color: #64748b; display: block;">${label}</span>
+                </div>
+              `;
+            }).join('')}
+            
+            ${(() => {
+              const url = loan.verification_evidence?.photos?.selfie;
+              if (!url) return '';
+              return `
+                <div style="text-align: center; width: 130px; border: 1px solid #e2e8f0; padding: 6px; border-radius: 8px; background-color: #ffffff;">
+                  <div style="height: 80px; display: flex; align-items: center; justify-content: center; background-color: #f8fafc; border-radius: 6px; overflow: hidden; margin-bottom: 4px;">
+                    <img src="${url}" style="max-height: 80px; max-width: 100%; object-fit: cover;" crossorigin="anonymous" />
+                  </div>
+                  <span style="font-size: 7px; font-weight: bold; color: #64748b; display: block;">LIVELINESS SELFIE</span>
+                </div>
+              `;
+            })()}
+          </div>
+        </div>
       `;
 
       const opt = {
-        margin: 0,
+        margin: 0.1,
         filename: `Agreement_${loan.id}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, letterRendering: true },
         jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
       };
 
-      await html2pdf().from(container).set(opt).save();
-      toast.success(t('link_generated') || 'PDF 계약서 다운로드 완료');
+      const pdfBlob = await html2pdf().from(container).set(opt).outputPdf('blob');
+      const pdfFile = new File([pdfBlob], `Agreement_${loan.id}.pdf`, { type: 'application/pdf' });
+
+      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        await navigator.share({
+          files: [pdfFile],
+          title: `MUtang Credit Contract (${loan.id.slice(0, 8)})`,
+          text: `Credit Agreement between ${loan.lender?.full_name || 'Lender'} and ${loan.borrower?.full_name || 'Borrower'}.`
+        });
+      } else {
+        const url = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Agreement_${loan.id}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      toast.success(t('link_generated') || 'PDF 계약서 다운로드 및 공유 완료');
     } catch (error) {
       console.error('PDF Generation Error:', error);
       toast.error(t('link_failed') || 'PDF 다운로드에 실패했습니다.');
@@ -438,23 +499,31 @@ export default function Transactions() {
   const [periodValue, setPeriodValue] = useState('30'); // '1'~'31', '30'(1개월), '60'(2개월), '90'(3개월), 'custom'
   const [customPeriodDays, setCustomPeriodDays] = useState('');
 
-  // ID Photos
+  // ID & Selfie Photos
   const [idPhotos, setIdPhotos] = useState<Record<string, { file: File | null; preview: string | null }>>({
     front1: { file: null, preview: null },
     back1: { file: null, preview: null },
     front2: { file: null, preview: null },
-    back2: { file: null, preview: null }
+    back2: { file: null, preview: null },
+    selfie: { file: null, preview: null }
   });
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
   const [isIdWarningOpen, setIsIdWarningOpen] = useState(false);
   const [isCreditDeductOpen, setIsCreditDeductOpen] = useState(false);
 
-  const handlePhotoCapture = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const preview = URL.createObjectURL(file);
-      setIdPhotos(prev => ({ ...prev, [id]: { file, preview } }));
-    }
+  // Live Camera States
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraMode, setCameraMode] = useState<'id' | 'selfie'>('id');
+  const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
+
+  // Expanded Evidence UI States
+  const [expandedEvidence, setExpandedEvidence] = useState<Record<string, boolean>>({});
+  const toggleEvidence = (loanId: string) => {
+    setExpandedEvidence(prev => ({ ...prev, [loanId]: !prev[loanId] }));
+  };
+
+  const processCapturedPhoto = (id: string, file: File, preview: string) => {
+    setIdPhotos(prev => ({ ...prev, [id]: { file, preview } }));
   };
 
   const fetchMarketplace = async () => {
@@ -514,7 +583,8 @@ export default function Transactions() {
       front1: { file: null, preview: null },
       back1: { file: null, preview: null },
       front2: { file: null, preview: null },
-      back2: { file: null, preview: null }
+      back2: { file: null, preview: null },
+      selfie: { file: null, preview: null }
     });
     setDueDateType('period');
     setIsAdjustable(false);
@@ -1247,7 +1317,84 @@ export default function Transactions() {
                       >
                         {isGeneratingPDF === loan.id ? t('preparing_pdf') : t('download_pdf')}
                       </Button>
+                      
+                      <Button
+                        onClick={() => toggleEvidence(loan.id)}
+                        variant="outline"
+                        className="flex-1 rounded-xl font-bold h-8 text-[11px] border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1.5 text-slate-700 dark:text-slate-200"
+                      >
+                        {expandedEvidence[loan.id] ? (
+                          <>
+                            <EyeOff className="w-3.5 h-3.5" />
+                            <span>증빙 닫기</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>증빙 사진 열람</span>
+                          </>
+                        )}
+                      </Button>
                     </div>
+
+                    {/* Expanded Identity Evidence Grid View */}
+                    {expandedEvidence[loan.id] && (
+                      <div className="mt-4 p-5 rounded-[24px] border border-blue-500/10 bg-blue-500/5 dark:bg-blue-500/5 space-y-4 animate-in slide-in-from-top-2 duration-300">
+                        <span className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-widest block">
+                          법적 신원 보증 증빙 자료 (Identity Evidence)
+                        </span>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                          {[
+                            { key: 'front1', label: t('id_front_1') },
+                            { key: 'back1', label: t('id_back_1') },
+                            { key: 'front2', label: t('id_front_2') },
+                            { key: 'back2', label: t('id_back_2') },
+                            { key: 'selfie', label: '본인 실물 셀피' }
+                          ].map((photoItem) => {
+                            const photoUrl = loan.verification_evidence?.photos?.[photoItem.key];
+                            return (
+                              <div key={photoItem.key} className="space-y-1 text-center">
+                                <div className={`aspect-[4/3] ${photoItem.key === 'selfie' ? 'rounded-full max-w-[64px] max-h-[64px] mx-auto' : 'rounded-xl'} bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 overflow-hidden relative group`}>
+                                  {photoUrl ? (
+                                    <img src={photoUrl} alt={photoItem.label} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-600 bg-slate-200/50 dark:bg-slate-800/50 text-[10px] italic">
+                                      미제출
+                                    </div>
+                                  )}
+                                </div>
+                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wide block">{photoItem.label}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Signatures Row */}
+                        <div className="grid grid-cols-2 gap-4 border-t border-blue-500/10 pt-3">
+                          <div className="text-center bg-white dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
+                            <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">LENDER SIGNATURE</span>
+                            <div className="h-12 flex items-center justify-center">
+                              {JSON.parse(loan.signature_data || '{}').lender ? (
+                                <img src={JSON.parse(loan.signature_data).lender} alt="Lender Signature" className="max-h-10 object-contain" />
+                              ) : (
+                                <span className="text-[9px] text-slate-400 italic">서명 없음</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-center bg-white dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
+                            <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">BORROWER SIGNATURE</span>
+                            <div className="h-12 flex items-center justify-center">
+                              {JSON.parse(loan.signature_data || '{}').borrower ? (
+                                <img src={JSON.parse(loan.signature_data).borrower} alt="Borrower Signature" className="max-h-10 object-contain" />
+                              ) : (
+                                <span className="text-[9px] text-slate-400 italic">서명 없음</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Payment Proof details section */}
@@ -1573,7 +1720,14 @@ export default function Transactions() {
                     { id: 'back2', label: t('id_back_2') }
                   ].map((p) => (
                     <div key={p.id} className="space-y-2 text-center">
-                      <div className="aspect-[4/3] bg-slate-50 dark:bg-white/5 rounded-[32px] border-2 border-dashed border-slate-200 dark:border-white/10 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 transition-all relative overflow-hidden group">
+                      <div 
+                        onClick={() => {
+                          setActivePhotoId(p.id);
+                          setCameraMode('id');
+                          setIsCameraOpen(true);
+                        }}
+                        className="aspect-[4/3] bg-slate-50 dark:bg-white/5 rounded-[32px] border-2 border-dashed border-slate-200 dark:border-white/10 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 transition-all relative overflow-hidden group"
+                      >
                         {idPhotos[p.id].preview ? (
                           <img src={idPhotos[p.id].preview!} alt={p.label} className="w-full h-full object-cover" />
                         ) : (
@@ -1584,10 +1738,40 @@ export default function Transactions() {
                             <span className="text-[9px] font-black text-slate-400 px-4 uppercase tracking-wider">{p.label}</span>
                           </>
                         )}
-                        <input type="file" accept="image/*" capture="environment" onChange={(e) => handlePhotoCapture(p.id, e)} className="absolute inset-0 opacity-0 cursor-pointer" />
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* 추가 본인 대조 Selfie 촬영 영역 (가로 전체 100%) */}
+                <div className="space-y-2 text-center">
+                  <div 
+                    onClick={() => {
+                      setActivePhotoId('selfie');
+                      setCameraMode('selfie');
+                      setIsCameraOpen(true);
+                    }}
+                    className="w-full h-28 bg-slate-50 dark:bg-white/5 rounded-[32px] border-2 border-dashed border-slate-200 dark:border-white/10 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 transition-all relative overflow-hidden group"
+                  >
+                    {idPhotos.selfie?.preview ? (
+                      <div className="flex items-center gap-4 w-full h-full px-6">
+                        <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-blue-500">
+                          <img src={idPhotos.selfie.preview} alt="Selfie" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-xs font-black text-blue-600 uppercase tracking-wide">Selfie Captured</p>
+                          <p className="text-[10px] text-slate-400 font-bold mt-1">본인 실물 대조 인증 완료</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Camera className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">5단계 본인 실물 셀피 촬영 (필수)</span>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-start gap-4 p-5 bg-blue-600/10 dark:bg-blue-600/20 border border-blue-600/20 rounded-[32px] text-blue-600 dark:text-blue-400 animate-pulse">
                   <ShieldCheck className="w-6 h-6 flex-shrink-0 mt-0.5" />
@@ -1645,8 +1829,9 @@ export default function Transactions() {
                       const back1Captured = !!idPhotos.back1.preview;
                       const front2Captured = !!idPhotos.front2.preview;
                       const back2Captured = !!idPhotos.back2.preview;
+                      const selfieCaptured = !!idPhotos.selfie?.preview;
                       
-                      if (!front1Captured || !back1Captured || !front2Captured || !back2Captured) {
+                      if (!front1Captured || !back1Captured || !front2Captured || !back2Captured || !selfieCaptured) {
                         setIsIdWarningOpen(true);
                         return;
                       }
@@ -2348,6 +2533,18 @@ export default function Transactions() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {isCameraOpen && activePhotoId && (
+        <MLIDCamera 
+          mode={cameraMode}
+          onCapture={(file, preview) => {
+            setIsCameraOpen(false);
+            processCapturedPhoto(activePhotoId, file, preview);
+          }}
+          onClose={() => setIsCameraOpen(false)}
+          t={t}
+        />
+      )}
     </div>
   );
 }

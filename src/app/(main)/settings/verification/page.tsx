@@ -25,6 +25,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { compressImage, verifyIDDocument, checkImageQuality } from '@/lib/kyc';
 import { QRCodeSVG } from 'qrcode.react';
+import MLIDCamera from '@/components/ui/MLIDCamera';
 
 const PRIMARY_IDS = [
   'Passport', 'Driver\'s License', 'UMID', 'SSS ID', 
@@ -43,6 +44,9 @@ export default function VerificationPage() {
   const [isStandalone, setIsStandalone] = useState(false);
   const [step, setStep] = useState(0); // 0: Guide, 1: ID1-Front, 2: ID1-Back, 3: ID2-Front, 4: ID2-Back, 5: Selfie, 6: Review
   
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraMode, setCameraMode] = useState<'id' | 'selfie'>('id');
+
   const [verificationData, setVerificationData] = useState({
     id1Type: '',
     id2Type: '',
@@ -58,10 +62,7 @@ export default function VerificationPage() {
     setIsStandalone(standalone);
   }, []);
 
-  const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processCapturedPhoto = async (file: File) => {
     setLoading(true);
     try {
       // 1. 이미지 압축
@@ -118,7 +119,7 @@ export default function VerificationPage() {
       toast.success(`${step}단계 검수 완료 및 실시간 업로드 완료!`);
       setStep(prev => prev + 1);
     } catch (error: any) {
-      toast.error(error.message || '이미지 업로드에 실패했습니다. 네트워크 상태를 확인 후 다시 찍어주세요.');
+      toast.error(error.message || '이미지 업로드에 실패했습니다. 다시 촬영해 주세요.');
     } finally {
       setLoading(false);
     }
@@ -298,37 +299,31 @@ export default function VerificationPage() {
               </p>
             </div>
 
-            <div className="relative aspect-[1.58/1] w-full bg-slate-100 dark:bg-slate-900 rounded-[40px] border-4 border-dashed border-slate-200 dark:border-white/10 overflow-hidden group">
+            <div 
+              onClick={() => {
+                if (loading) return;
+                setCameraMode(isSelfieStep ? 'selfie' : 'id');
+                setIsCameraOpen(true);
+              }}
+              className="relative aspect-[1.58/1] w-full bg-slate-100 dark:bg-slate-900 rounded-[40px] border-4 border-dashed border-slate-200 dark:border-white/10 overflow-hidden group cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/5 transition-all flex flex-col items-center justify-center"
+            >
               {loading ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm z-20">
                   <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
                   <span className="font-black animate-pulse text-sm text-slate-800 dark:text-slate-200">
-                    AI 화질 실시간 정밀 진증 중...
+                    AI 화질 실시간 정밀 인증 중...
                   </span>
                 </div>
               ) : null}
 
-              {/* Guide Overlay */}
-              <div className="absolute inset-0 border-[32px] border-black/40 flex items-center justify-center z-10 pointer-events-none">
-                <div className="w-full h-full border-2 border-white/50 rounded-2xl flex items-center justify-center">
-                  <p className="text-white text-[10px] font-black uppercase tracking-[0.2em] bg-black/60 px-4 py-2 rounded-full backdrop-blur-sm">
-                    {isSelfieStep ? '정면을 바라봐 주세요' : (t('camera_guide_overlay') || '여기에 신분증 정렬')}
-                  </p>
+              <div className="flex flex-col items-center justify-center text-slate-400 gap-3">
+                <div className="w-16 h-16 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Camera className="w-8 h-8 text-blue-600" />
                 </div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  {isSelfieStep ? '여기를 눌러 셀피 카메라 켜기' : '여기를 눌러 신분증 카메라 켜기'}
+                </span>
               </div>
-
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
-                <Camera className="w-16 h-16 mb-4 opacity-20" />
-              </div>
-
-              <input 
-                type="file" 
-                accept="image/*" 
-                capture={isSelfieStep ? "user" : "environment"} 
-                className="absolute inset-0 opacity-0 cursor-pointer z-30"
-                onChange={handleCapture}
-                disabled={loading}
-              />
             </div>
 
             <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-3xl flex items-start gap-3">
@@ -422,6 +417,18 @@ export default function VerificationPage() {
       <div className="transition-all duration-300">
         {renderStep()}
       </div>
+
+      {isCameraOpen && (
+        <MLIDCamera 
+          mode={cameraMode}
+          onCapture={(file, preview) => {
+            setIsCameraOpen(false);
+            processCapturedPhoto(file);
+          }}
+          onClose={() => setIsCameraOpen(false)}
+          t={t}
+        />
+      )}
     </div>
   );
 }
