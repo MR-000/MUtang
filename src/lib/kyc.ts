@@ -125,30 +125,30 @@ export const checkImageQuality = (blob: Blob): Promise<{ success: boolean; messa
         // 평균 에지 강도 (선명도 계수 보정)
         const sharpnessScore = edgeDeltaSum / (pixelCount / 9);
 
-        // [판별 규칙 1] 빛반사 감출: 흰색 반사 영역이 전체 이미지의 5%를 초과하는 경우
+        // [판별 규칙 1] 빛반사 검사 완화 (흰색 반사 영역이 15% 초과할 때 판정)
         const glareRatio = glarePixels / pixelCount;
-        if (glareRatio > 0.05) {
+        if (glareRatio > 0.15) {
           resolve({
             success: false,
-            message: '신분증 표면에 강한 빛반사가 감지되었습니다. 조명이 직접 비치지 않는 어두운 곳으로 이동하거나 각도를 약간 조절하여 다시 찍어주세요.'
+            message: '신분증 표면에 강한 빛반사가 감지되었습니다. 조명이 직접 비치지 않는 곳으로 각도를 조절하여 다시 촬영해 주세요.'
           });
           return;
         }
 
-        // [판별 규칙 2] 흐릿함(블러/초점 안맞음) 감출: 선명도 계수가 기준치(7.0) 이하인 경우
-        if (sharpnessScore < 7.0) {
+        // [판별 규칙 2] 흐릿함 검사 완화 (선명도 계수가 3.0 이하일 때 흔들림 판정)
+        if (sharpnessScore < 3.0) {
           resolve({
             success: false,
-            message: '사진이 흔들렸거나 초점이 맞지 않아 흐릿합니다. 휴대폰을 고정하고 카메라 초점을 다시 맞춰서 선명하게 촬영해 주세요.'
+            message: '사진이 흔들렸거나 초점이 흐릿합니다. 휴대폰을 고정하고 선명하게 다시 촬영해 주세요.'
           });
           return;
         }
 
-        // [판별 규칙 3] 촬영 환경 밝기: 너무 어둡게 촬영된 경우
-        if (avgBrightness < 45) {
+        // [판별 규칙 3] 촬영 환경 밝기 완화 (Luminance 평균 25 이하일 때 어두움 판정)
+        if (avgBrightness < 25) {
           resolve({
             success: false,
-            message: '촬영된 이미지가 너무 어둡습니다. 충분한 광량이 확보된 밝은 장소에서 다시 촬영해 주세요.'
+            message: '촬영된 화면이 너무 어둡습니다. 밝은 조명 아래에서 다시 촬영해 주세요.'
           });
           return;
         }

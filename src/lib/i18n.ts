@@ -336,7 +336,7 @@ export const translations: Dictionary = {
   search_customers: { en: "Search customers by name or phone...", tl: "Maghanap ng customer...", ko: "이름 또는 전화번호로 고객 검색...", zh: "通过姓名或电话搜索客户...", ja: "名前または電話番号で顧客を検索..." },
   no_results: { en: "No results found.", tl: "Walang nahanap na resulta.", ko: "검색 결과가 없습니다.", zh: "未找到结果。", ja: "検索結果が見つかりません。" },
   no_customers: { en: "No customers registered yet.", tl: "Wala pang nakarehistrong customer.", ko: "등록된 고객이 없습니다.", zh: "暂无注册客户。", ja: "登録された顧客はまだいません。" },
-  add_customer_hint: { en: "Click the add button above to register your first customer.", tl: "I-click ang button sa itaas para magdagdag.", ko: "상단의 신규 고객 추가 버튼을 클릭해 첫 거래처를 등록하세요.", zh: "点击上方添加按钮注册您的第一个客户。", ja: "上の追加ボタンをクリックして最初の顧客을登録してください。" },
+  add_customer_hint: { en: "Click the add button above to register your first customer.", tl: "I-click ang button sa itaas para magdagdag.", ko: "상단의 신규 고객 추가 버튼을 클릭해 첫 거래처를 등록하세요.", zh: "点击上方添加按钮注册您的第一个客户。", ja: "上の追加ボタンをクリックして最初の顧客を登録してください。" },
   customer_added: { en: "Customer registered successfully", tl: "Matagumpay na nairehistro ang customer", ko: "고객 정보가 성공적으로 등록되었습니다.", zh: "客户注册成功", ja: "顧客情報が正常に登録されました" },
   login_title: { en: "MUtang", tl: "MUtang", ko: "MUtang", zh: "MUtang", ja: "MUtang" },
   login_subtitle: { en: "Trust-based Agreement Marketplace", tl: "Kasunduan sa Pagitan ng mga User", ko: "신뢰 기반 외상 거래 마켓플레이스", zh: "基于信任的协议市场", ja: "信頼に基づく合意マーケットプレイス" },
@@ -417,6 +417,6 @@ export const translations: Dictionary = {
   coin_label: { en: "Coin", tl: "Coin", ko: "코인", zh: "代币", ja: "コイン" },
   borrower_label: { en: "Borrower", tl: "Mangungutang", ko: "채무자", zh: "借款人", ja: "債務者" },
   financial_terms_title: { en: "Financial Terms & Repayment Info", tl: "Mga Termino sa Pananalapi at Impormasyon ng Pagbabayad", ko: "거래 금융 조건 및 상환 정보", zh: "金融条款与还款信息", ja: "取引金融条件および返済情報" },
-  signature_not_registered: { en: "Not Registered", tl: "Hindi Pa Nairehistro", ko: "서명 미등록", zh: "未注册", ja: "未登録" }
+  signature_not_registered: { en: "Not Registered", tl: "Hindi Pa Nairehistro", ko: "서명 미등록", zh: "未注册", ja: "未登録" },
 };
 export const getTranslation = (key: string, lang: Language) => { return translations[key]?.[lang] || translations[key]?.['en'] || key; };

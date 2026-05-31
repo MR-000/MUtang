@@ -45,6 +45,7 @@ import { TierBadge } from '@/components/ui/tier-badge';
 import { VerificationGuard } from '@/components/VerificationGuard';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { compressImage, checkImageQuality } from '@/lib/kyc';
 
 interface Debt {
   id: string;
@@ -500,12 +501,12 @@ export default function Transactions() {
   const [customPeriodDays, setCustomPeriodDays] = useState('');
 
   // ID & Selfie Photos
-  const [idPhotos, setIdPhotos] = useState<Record<string, { file: File | null; preview: string | null }>>({
-    front1: { file: null, preview: null },
-    back1: { file: null, preview: null },
-    front2: { file: null, preview: null },
-    back2: { file: null, preview: null },
-    selfie: { file: null, preview: null }
+  const [idPhotos, setIdPhotos] = useState<Record<string, { file: File | null; preview: string | null; publicUrl?: string | null }>>({
+    front1: { file: null, preview: null, publicUrl: null },
+    back1: { file: null, preview: null, publicUrl: null },
+    front2: { file: null, preview: null, publicUrl: null },
+    back2: { file: null, preview: null, publicUrl: null },
+    selfie: { file: null, preview: null, publicUrl: null }
   });
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
   const [isIdWarningOpen, setIsIdWarningOpen] = useState(false);
@@ -522,8 +523,63 @@ export default function Transactions() {
     setExpandedEvidence(prev => ({ ...prev, [loanId]: !prev[loanId] }));
   };
 
-  const processCapturedPhoto = (id: string, file: File, preview: string) => {
-    setIdPhotos(prev => ({ ...prev, [id]: { file, preview } }));
+  const processCapturedPhoto = async (id: string, file: File, preview: string) => {
+    setIsUploadingPhotos(true);
+    try {
+      // 1. 이미지 압축 및 화질 검사
+      const compressedBlob = await compressImage(file);
+      const qualityCheck = await checkImageQuality(compressedBlob);
+      if (!qualityCheck.success) {
+        toast.error(qualityCheck.message, { duration: 6000 });
+        setIsUploadingPhotos(false);
+        return;
+      }
+
+      // 2. 실시간 스토리지 업로드
+      const bucket = 'id-verification';
+      const fileExt = 'jpg';
+      const fileName = `${user?.id}-${Date.now()}-${id}.${fileExt}`;
+      
+      // 구형 이미지 클린업 (용량 보호)
+      try {
+        const { data: fileList, error: listError } = await supabase.storage
+          .from(bucket)
+          .list('');
+          
+        if (!listError && fileList) {
+          const filesToDelete = fileList
+            .filter(f => f.name.startsWith(`${user?.id}`) && f.name.includes(`-${id}.`))
+            .map(f => f.name);
+            
+          if (filesToDelete.length > 0) {
+            await supabase.storage.from(bucket).remove(filesToDelete);
+          }
+        }
+      } catch (cleanupError) {
+        console.warn('Storage cleanup warn:', cleanupError);
+      }
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(fileName, compressedBlob, { upsert: true, contentType: 'image/jpeg' });
+
+      if (uploadError) throw uploadError;
+
+      // 3. 업로드 완료 후 Public URL 획득
+      const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(fileName);
+
+      setIdPhotos(prev => ({
+        ...prev,
+        [id]: { file, preview, publicUrl }
+      }));
+
+      toast.success(t('upload_proof_success') || '업로드 및 임시 제출 완료!');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || '업로드 실패. 다시 시도해 주세요.');
+    } finally {
+      setIsUploadingPhotos(false);
+    }
   };
 
   const fetchMarketplace = async () => {
@@ -761,24 +817,11 @@ export default function Transactions() {
     setIsSubmitting(true);
     setIsUploadingPhotos(true);
     try {
-      // 1. Upload ID Photos
+      // 1. Upload ID Photos (사전 즉시 업로드된 이미지 URL 참조)
       const uploadedUrls: Record<string, string> = {};
-      const bucket = 'id-verification';
-      
       for (const [key, photo] of Object.entries(idPhotos)) {
-        if (photo.file) {
-          const fileExt = photo.file.name.split('.').pop();
-          const fileName = `${user?.id}-${Date.now()}-${key}.${fileExt}`;
-          const { data, error: uploadError } = await supabase.storage
-            .from(bucket)
-            .upload(fileName, photo.file, { upsert: true });
-            
-          if (uploadError) {
-            console.error('Upload error:', uploadError);
-          } else if (data) {
-            const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(data.path);
-            uploadedUrls[key] = publicUrl;
-          }
+        if (photo.publicUrl) {
+          uploadedUrls[key] = photo.publicUrl;
         }
       }
       setIsUploadingPhotos(false);
@@ -1553,7 +1596,10 @@ export default function Transactions() {
 
       {/* Transaction Modal */}
       <Dialog open={isTransactionOpen} onOpenChange={setIsTransactionOpen}>
-        <DialogContent className="max-w-md w-[95%] h-[85vh] md:h-[75vh] rounded-[32px] dark:bg-slate-950 dark:border-white/5 px-6 pt-8 flex flex-col outline-none overflow-hidden">
+        <DialogContent 
+          style={isCameraOpen ? { display: 'none' } : undefined}
+          className="max-w-md w-[95%] h-[85vh] md:h-[75vh] rounded-[32px] dark:bg-slate-950 dark:border-white/5 px-6 pt-8 flex flex-col outline-none overflow-hidden"
+        >
           <DialogHeader className="pb-4 shrink-0">
             <div className="flex justify-center mb-4">
               <div className="flex gap-1.5">
@@ -1760,7 +1806,7 @@ export default function Transactions() {
                         </div>
                         <div className="text-left">
                           <p className="text-xs font-black text-blue-600 uppercase tracking-wide">Selfie Captured</p>
-                          <p className="text-[10px] text-slate-400 font-bold mt-1">본인 실물 대조 인증 완료</p>
+                          <p className="text-[10px] text-slate-400 font-bold mt-1">{t('selfie_verified_label')}</p>
                         </div>
                       </div>
                     ) : (
@@ -1768,7 +1814,7 @@ export default function Transactions() {
                         <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
                           <Camera className="w-5 h-5 text-blue-600" />
                         </div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">5단계 본인 실물 셀피 촬영 (필수)</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t('selfie_capture_required')}</span>
                       </>
                     )}
                   </div>
@@ -1861,17 +1907,17 @@ export default function Transactions() {
           </div>
           <DialogHeader>
             <DialogTitle className="text-xl font-black dark:text-white">
-              {t('id_warning_title') || '신분증 촬영 필수'}
+              {t('id_warning_title')}
             </DialogTitle>
           </DialogHeader>
           <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-bold">
-            {t('id_warning_message') || '안전한 외상 거래 체결을 위해 양측 거래 당사자의 1차, 2차 신분증 앞/뒷면을 모두 촬영해 주세요.'}
+            {t('id_warning_message')}
           </p>
           <Button 
             onClick={() => setIsIdWarningOpen(false)}
             className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-sm active:scale-95 transition-all shadow-md"
           >
-            {t('confirm') || '확인'}
+            {t('confirm')}
           </Button>
         </DialogContent>
       </Dialog>
@@ -1881,7 +1927,7 @@ export default function Transactions() {
         <DialogContent className="max-w-md w-[95%] rounded-[32px] dark:bg-slate-950 dark:border-white/5 p-6 outline-none flex flex-col space-y-5">
           <DialogHeader>
             <DialogTitle className="text-xl font-black dark:text-white text-center">
-              {t('credit_deduction_title') || '거래 체결 및 크레딧 차감 동의'}
+              {t('credit_deduction_title')}
             </DialogTitle>
           </DialogHeader>
 
