@@ -643,7 +643,7 @@ export default function Transactions() {
 
   const handleCreatePost = async () => {
     if (!amount) {
-      toast.error('원금 금액을 입력해주세요.');
+      toast.error(t('toast_enter_amount'));
       return;
     }
     
@@ -653,7 +653,7 @@ export default function Transactions() {
       const parsedInterest = parseFloat(interestRate || '0');
       
       if (parsedInterest > 6) {
-        toast.error('필리핀 법정 연 이자율 제한에 따라 이자율은 최대 6%까지만 설정 가능합니다.');
+        toast.error(t('toast_interest_limit'));
         setIsSubmitting(false);
         return;
       }
@@ -671,7 +671,7 @@ export default function Transactions() {
           }
         }
         if (isOverdueViolated) {
-          toast.error('필리핀 법정 상한 금리 규칙에 따라, 미납 시 연체 지연이율 또한 최대 연 6%를 초과할 수 없습니다.');
+          toast.error(t('toast_overdue_rate_violation'));
           setIsSubmitting(false);
           return;
         }
@@ -740,13 +740,13 @@ export default function Transactions() {
 
       if (error) throw error;
 
-      toast.success('공고가 성공적으로 마켓플레이스에 등록되었습니다.');
+      toast.success(t('toast_post_registered'));
       setIsPostModalOpen(false);
       resetTransactionForm();
       fetchMarketplace();
     } catch (error: any) {
       console.error(error);
-      toast.error(error.message || '공고 등록 중 오류가 발생했습니다.');
+      toast.error(error.message || t('toast_post_error'));
     } finally {
       setIsSubmitting(false);
     }
@@ -905,29 +905,29 @@ export default function Transactions() {
     if (!payingLoan || !user) return;
     
     if (!proofFile) {
-      toast.error('송금 완료 영수증 스크린샷을 첨부해 주세요.');
+      toast.error(t('toast_attach_receipt'));
       return;
     }
     
     if (paymentMethod === 'gcash') {
       if (!gcashReference || gcashReference.trim().length < 8) {
-        toast.error('참조번호를 8자리 이상 정확하게 입력해 주세요.');
+        toast.error(t('toast_ref_number_invalid'));
         return;
       }
     } else {
       if (!walletAddress || walletAddress.trim().length < 10) {
-        toast.error('송금하신 본인의 지갑 주소 또는 거래소 주소를 정확하게 입력해 주세요.');
+        toast.error(t('toast_wallet_address_invalid'));
         return;
       }
     }
     
     if (!amountClaimed || parseFloat(amountClaimed) <= 0) {
-      toast.error('실제 입금한 금액을 입력해 주세요.');
+      toast.error(t('toast_enter_deposit_amount'));
       return;
     }
     
     if (!depositedAt) {
-      toast.error('송금 완료 시각을 선택해 주세요.');
+      toast.error(t('toast_enter_deposit_time'));
       return;
     }
 
@@ -944,7 +944,7 @@ export default function Transactions() {
         .upload(filePath, proofFile, { upsert: true });
 
       if (uploadError) {
-        throw new Error(`이미지 업로드에 실패했습니다: ${uploadError.message}`);
+        throw new Error(`${t('toast_upload_failed')}: ${uploadError.message}`);
       }
 
       // 2. Get Public URL
@@ -973,23 +973,23 @@ export default function Transactions() {
       }
 
       // 4. Send real-time notification
-      const methodLabel = paymentMethod === 'gcash' ? 'GCash' : `${coinType.toUpperCase()} 코인`;
+      const methodLabel = paymentMethod === 'gcash' ? 'GCash' : `${coinType.toUpperCase()} ${t('coin_label')}`;
       await supabase
         .from('notifications')
         .insert({
           user_id: payingLoan.lender_id,
-          title: '상환 증빙 자료 제출',
-          message: `${profile?.full_name || '채무자'}님이 ${methodLabel} 상환 증빙(PHP ${Number(amountClaimed).toLocaleString()})을 제출했습니다. 확인 후 승인해 주세요.`,
+          title: t('toast_repay_notification_title'),
+          message: t('toast_repay_notification_msg').replace('{name}', profile?.full_name || t('borrower_label')).replace('{method}', methodLabel).replace('{amount}', Number(amountClaimed).toLocaleString()),
           type: 'payment'
         });
 
-      toast.success('증빙이 제출되었습니다. 채권자 최종 확인 또는 1시간 후 자동 상환 처리됩니다.');
+      toast.success(t('toast_repay_submitted'));
       setIsPaymentOpen(false);
       resetGCashPaymentForm();
       fetchLoans();
     } catch (err: any) {
       console.error('Payment proof error:', err);
-      toast.error(err.message || '상환 증빙 제출 중 오류가 발생했습니다.');
+      toast.error(err.message || t('toast_repay_error'));
     } finally {
       setIsUploadingProof(false);
     }
@@ -1013,17 +1013,17 @@ export default function Transactions() {
 
       if (response.ok && result.success) {
         if (action === 'confirm') {
-          toast.success('입금 확인 및 상환 승인이 최종 완료되었습니다.');
+          toast.success(t('toast_confirm_approved'));
         } else {
-          toast.success('상환 증빙이 거절 및 반려 처리되었습니다.');
+          toast.success(t('toast_confirm_rejected'));
         }
         fetchLoans();
       } else {
-        toast.error(result.error || '처리 중 오류가 발생했습니다.');
+        toast.error(result.error || t('toast_confirm_error'));
       }
     } catch (err: any) {
       console.error('Lender confirm error:', err);
-      toast.error('서버 연결 중 오류가 발생했습니다. 다시 시도해 주세요.');
+      toast.error(t('toast_server_error'));
     } finally {
       setIsConfirmingProof(false);
     }
@@ -1341,7 +1341,7 @@ export default function Transactions() {
                     {expandedEvidence[loan.id] && (
                       <div className="mt-4 p-5 rounded-[24px] border border-blue-500/10 bg-blue-500/5 dark:bg-blue-500/5 space-y-4 animate-in slide-in-from-top-2 duration-300">
                         <span className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-widest block">
-                          법적 신원 보증 증빙 자료 (Identity Evidence)
+                          {t('identity_evidence_title')}
                         </span>
                         
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -1350,7 +1350,7 @@ export default function Transactions() {
                             { key: 'back1', label: t('id_back_1') },
                             { key: 'front2', label: t('id_front_2') },
                             { key: 'back2', label: t('id_back_2') },
-                            { key: 'selfie', label: '본인 실물 셀피' }
+                            { key: 'selfie', label: t('selfie_label') }
                           ].map((photoItem) => {
                             const photoUrl = loan.verification_evidence?.photos?.[photoItem.key];
                             return (
@@ -1360,7 +1360,7 @@ export default function Transactions() {
                                     <img src={photoUrl} alt={photoItem.label} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-600 bg-slate-200/50 dark:bg-slate-800/50 text-[10px] italic">
-                                      미제출
+                                      {t('not_submitted')}
                                     </div>
                                   )}
                                 </div>
@@ -1410,7 +1410,7 @@ export default function Transactions() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <FileText className="w-4 h-4 text-blue-500" />
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">GCash 결제 증빙</span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t('gcash_payment_proof')}</span>
                           </div>
                           <div>
                             <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full shadow-sm inline-block ${
@@ -1418,30 +1418,30 @@ export default function Transactions() {
                               latestProof.status === 'confirmed' || latestProof.status === 'auto_confirmed' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' :
                               'bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400'
                             }`}>
-                              {latestProof.status === 'submitted' ? '승인 대기중' :
-                               latestProof.status === 'confirmed' ? '채권자 승인완료' :
-                               latestProof.status === 'auto_confirmed' ? '자동 승인완료' : '거절됨'}
+                              {latestProof.status === 'submitted' ? t('proof_status_submitted') :
+                               latestProof.status === 'confirmed' ? t('proof_status_confirmed') :
+                               latestProof.status === 'auto_confirmed' ? t('proof_status_auto_confirmed') : t('proof_status_rejected')}
                             </span>
                           </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3.5 text-xs border-t border-dashed border-slate-200 dark:border-white/5 pt-3">
                           <div>
-                            <span className="font-bold text-slate-400">GCash 참조 번호:</span>
+                            <span className="font-bold text-slate-400">{t('gcash_ref_label')}</span>
                             <p className="font-extrabold text-slate-700 dark:text-slate-200 mt-0.5">{latestProof.gcash_reference || '-'}</p>
                           </div>
                           <div>
-                            <span className="font-bold text-slate-400">실제 입금액:</span>
+                            <span className="font-bold text-slate-400">{t('actual_deposit_label')}</span>
                             <p className="font-extrabold text-slate-700 dark:text-slate-200 mt-0.5">PHP {Number(latestProof.amount_claimed).toLocaleString()}</p>
                           </div>
                           <div>
-                            <span className="font-bold text-slate-400">입금 시각:</span>
+                            <span className="font-bold text-slate-400">{t('deposit_time_label')}</span>
                             <p className="font-extrabold text-slate-700 dark:text-slate-200 mt-0.5">
                               {latestProof.deposited_at ? format(new Date(latestProof.deposited_at), 'yyyy-MM-dd HH:mm') : '-'}
                             </p>
                           </div>
                           <div>
-                            <span className="font-bold text-slate-400">제출 시각:</span>
+                            <span className="font-bold text-slate-400">{t('submitted_at_label')}</span>
                             <p className="font-extrabold text-slate-700 dark:text-slate-200 mt-0.5">
                               {latestProof.submitted_at ? format(new Date(latestProof.submitted_at), 'yyyy-MM-dd HH:mm') : '-'}
                             </p>
@@ -1453,10 +1453,10 @@ export default function Transactions() {
                             <Clock className="w-4 h-4 mt-0.5 shrink-0" />
                             <div className="text-[11px] font-bold">
                               {isLender 
-                                ? '채무자가 송금 후 영수증을 업로드했습니다. 정보가 올바른지 대조 후 승인을 눌러주세요. 1시간 이내 무응답 시 자동 승인됩니다.' 
-                                : '송금 완료 후 승인 대기중입니다. 채권자가 1시간 이내 시스템에서 자동 승인 및 상환 확정 처리합니다.'}
+                                ? t('proof_lender_guide') 
+                                : t('proof_borrower_guide')}
                               <p className="mt-1 text-[10px] text-amber-500/80 font-black">
-                                자동 승인 예정: {format(new Date(latestProof.auto_confirm_deadline), 'yyyy-MM-dd HH:mm')}
+                                {t('auto_confirm_scheduled')} {format(new Date(latestProof.auto_confirm_deadline), 'yyyy-MM-dd HH:mm')}
                               </p>
                             </div>
                           </div>
@@ -1466,14 +1466,14 @@ export default function Transactions() {
                           <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-500/5 border border-rose-500/10 text-rose-600 dark:text-rose-400">
                             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                             <div className="text-[11px] font-bold">
-                              송금 증빙이 거절되었습니다. 영수증 이미지와 입력 정보를 다시 한번 대조하여 올바르게 다시 상환을 시도해 주세요.
+                              {t('proof_rejected_guide')}
                             </div>
                           </div>
                         )}
 
                         {latestProof.screenshot_url && (
                           <div className="space-y-1.5 pt-1">
-                            <span className="font-bold text-slate-400 text-xs">첨부된 GCash 영수증</span>
+                            <span className="font-bold text-slate-400 text-xs">{t('attached_receipt')}</span>
                             <div className="relative aspect-[4/3] w-full max-w-[200px] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 group cursor-pointer shadow-sm">
                               <img 
                                 src={latestProof.screenshot_url} 
@@ -1482,7 +1482,7 @@ export default function Transactions() {
                                 onClick={() => window.open(latestProof.screenshot_url, '_blank')}
                               />
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-black transition-opacity">
-                                크게 보기
+                                {t('view_larger_label')}
                               </div>
                             </div>
                           </div>
@@ -1496,7 +1496,7 @@ export default function Transactions() {
                               disabled={isConfirmingProof}
                               className="flex-1 h-11 rounded-xl border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600 font-bold active:scale-95 transition-all text-xs"
                             >
-                              반려 (거절)
+                              {t('reject_btn')}
                             </Button>
                             <Button
                               onClick={() => handleConfirmPaymentProof(latestProof.id, 'confirm')}
@@ -1508,7 +1508,7 @@ export default function Transactions() {
                               ) : (
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                               )}
-                              입금 확정 승인
+                              {t('confirm_deposit_btn')}
                             </Button>
                           </div>
                         )}

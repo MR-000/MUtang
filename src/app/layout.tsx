@@ -13,6 +13,9 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "MUtang",
   },
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
