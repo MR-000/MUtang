@@ -38,7 +38,20 @@ export function VerificationGuard({ onSuccess, isOpen, onClose }: VerificationGu
   if (!profile?.full_name) missingInfo.push({ id: 'name', label: t('full_name'), icon: User });
   if (!profile?.phone) missingInfo.push({ id: 'phone', label: t('phone_number'), icon: Phone });
   if (!profile?.email) missingInfo.push({ id: 'email', label: t('email_address'), icon: Mail });
-  if (!profile?.id_front_url || !profile?.id_front_url_2) missingInfo.push({ id: 'id', label: t('id_docs_count'), icon: IdCard });
+  if (!profile?.id_front_url || !profile?.id_front_url_2) {
+    missingInfo.push({ id: 'id', label: t('id_docs_count'), icon: IdCard });
+  } else if (profile?.id_expiry) {
+    // 신분증 유효기간 만료일 체크
+    const expiry = new Date(profile.id_expiry);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    expiry.setHours(0, 0, 0, 0);
+    
+    if (expiry <= today) {
+      // 신분증 만료 시, 인증 누락 상태로 처리하여 이용 차단
+      missingInfo.push({ id: 'expired_id', label: '신분증 유효기간 만료 (갱신 필요)', icon: IdCard });
+    }
+  }
 
   const isVerified = missingInfo.length === 0 && profile?.verification_status === 'verified';
 

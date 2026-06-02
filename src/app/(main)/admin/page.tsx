@@ -925,7 +925,10 @@ export default function AdminConsole() {
                       {selectedUser.phone || "번호없음"}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-[10px] text-slate-500 font-extrabold">
+                  <div className="text-[10px] text-slate-400/80 font-bold border-t border-slate-100 dark:border-white/5 pt-1.5 break-all">
+                    회원 고유 ID (UUID): <code className="bg-slate-200 dark:bg-white/10 px-1 py-0.5 rounded select-all font-mono">{selectedUser.id}</code>
+                  </div>
+                  <div className="flex justify-between items-center text-[10px] text-slate-500 font-extrabold border-t border-slate-100 dark:border-white/5 pt-1.5">
                     <span>현재 사용 크레딧: ₱{selectedUser.credit ? selectedUser.credit.toLocaleString() : 0}</span>
                     <span>현재 신용 점수: {selectedUser.trust_score}점</span>
                   </div>
