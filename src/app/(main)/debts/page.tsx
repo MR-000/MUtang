@@ -817,6 +817,22 @@ export default function Transactions() {
       toast.error(t('complete_all_fields'));
       return;
     }
+
+    // 1차 신분증과 2차 신분증 중복 촬영 검사 (위변조 부정 거래 차단)
+    const front1Url = idPhotos.front1?.publicUrl || idPhotos.front1?.preview;
+    const front2Url = idPhotos.front2?.publicUrl || idPhotos.front2?.preview;
+    const back1Url = idPhotos.back1?.publicUrl || idPhotos.back1?.preview;
+    const back2Url = idPhotos.back2?.publicUrl || idPhotos.back2?.preview;
+
+    if (front1Url && front2Url && front1Url === front2Url) {
+      toast.error('보안 위반 경고: 1차 신분증 앞면과 2차 신분증 앞면 이미지에 동일한 파일이 감지되었습니다. 서로 다른 2개의 실물 신분증을 촬영해 주세요.', { duration: 6000 });
+      return;
+    }
+
+    if (back1Url && back2Url && back1Url === back2Url) {
+      toast.error('보안 위반 경고: 1차 신분증 뒷면과 2차 신분증 뒷면 이미지에 동일한 파일이 감지되었습니다. 서로 다른 2개의 실물 신분증을 촬영해 주세요.', { duration: 6000 });
+      return;
+    }
     
     setIsSubmitting(true);
     setIsUploadingPhotos(true);
