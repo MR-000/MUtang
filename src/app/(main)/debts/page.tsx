@@ -133,9 +133,19 @@ const getSmartTranslatedText = (text: string | null | undefined, t: any): string
     const rateLabel = t('interest_rate_label') || '이율';
     const overdueLabel = t('overdue_rules_label') || '연체규정';
     
+    const reversePolicyMap: Record<string, string> = {
+      "연체 시 필리핀 법정 지연이자율 연 6% 이하 부과": "overdue_policy_3",
+      "연체 시 매일 1% 연체료 부과": "overdue_policy_4",
+      "연체 시 연 5% 지연이자율 적용": "overdue_policy_5",
+      "연체 시 연 24% 법정 지연손해금 적용": "overdue_policy_6",
+      "기한 내 미납 시 일일 1%의 연체료 지불을 약속합니다.": "overdue_policy_1",
+      "연체 시 일일 0.8%의 연체료가 부과됨에 동의합니다.": "overdue_policy_2",
+    };
+
     mainBody = cleanBody.replace(/\(이율:\s*(\d+(?:\.\d+)?%)\s*,\s*연체규정:\s*([^)]+)\)/gi, (_, rate, policy) => {
       const policyKey = policy.trim();
-      const translatedPolicy = t(policyKey) || policyKey;
+      const mappedKey = reversePolicyMap[policyKey] || policyKey;
+      const translatedPolicy = t(mappedKey) || policyKey;
       return `(${rateLabel}: ${rate}, ${overdueLabel}: ${translatedPolicy})`;
     });
 
