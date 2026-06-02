@@ -422,11 +422,47 @@ export default function Transactions() {
         margin: 0.1,
         filename: `Agreement_${loan.id}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true, 
+          letterRendering: true,
+          logging: false,
+          // html2canvas가 oklch 등 최신 CSS 함수를 파싱하다가 죽는 문제를 방지하기 위해
+          // 외부 스타일시트의 분석 시도를 차단하고 인라인 스타일만 온전히 그리도록 격리 유도
+          ignoreElements: (element: any) => false
+        },
         jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
       };
 
+      // html2pdf가 전역 스타일시트 내 oklch()를 읽어서 오류를 뱉는 것을 근본적으로 차단하기 위해
+      // pdf 변환 직전 전역 스타일에서 oklch 단어를 포함한 stylesheet를 일시적으로 비활성화 후 복원
+      const activeStylesheets: HTMLLinkElement[] = [];
+      const activeStyleTags: HTMLStyleElement[] = [];
+      
+      try {
+        // link 태그 및 style 태그 필터링 비활성화
+        document.querySelectorAll('link[rel="stylesheet"]').forEach((el: any) => {
+          if (el.href && !el.disabled) {
+            el.disabled = true;
+            activeStylesheets.push(el);
+          }
+        });
+        document.querySelectorAll('style').forEach((el: any) => {
+          if (!el.disabled && el.innerHTML.includes('oklch')) {
+            el.disabled = true;
+            activeStyleTags.push(el);
+          }
+        });
+      } catch (err) {
+        console.warn('Style bypass error:', err);
+      }
+
       const pdfBlob = await html2pdf().from(container).set(opt).outputPdf('blob');
+
+      // 비활성화했던 스타일시트 즉각 원상복구 (화면 깨짐 방지)
+      activeStylesheets.forEach(el => el.disabled = false);
+      activeStyleTags.forEach(el => el.disabled = false);
+
       const pdfFile = new File([pdfBlob], `Agreement_${loan.id}.pdf`, { type: 'application/pdf' });
 
       if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
