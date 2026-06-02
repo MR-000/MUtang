@@ -172,6 +172,8 @@ export default function Transactions() {
   const [isTransactionOpen, setIsTransactionOpen] = useState(false);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<MatchingRequest | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [postToDeleteId, setPostToDeleteId] = useState<string | null>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<string | null>(null);
 
   const loadHtml2PdfScript = (): Promise<any> => {
@@ -777,15 +779,19 @@ export default function Transactions() {
     setIsPostModalOpen(true);
   };
 
-  const handleDeletePost = async (id: string) => {
-    const confirmDelete = window.confirm("정말로 해당 외상거래 공고를 삭제 및 취소하시겠습니까?");
-    if (!confirmDelete) return;
+  const handleDeletePost = (id: string) => {
+    setPostToDeleteId(id);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDeletePost = async () => {
+    if (!postToDeleteId) return;
 
     try {
       const { error } = await supabase
         .from('matching_requests')
         .delete()
-        .eq('id', id);
+        .eq('id', postToDeleteId);
 
       if (error) throw error;
       toast.success(t('toast_post_deleted') || '공고가 성공적으로 삭제되었습니다.');
@@ -793,6 +799,9 @@ export default function Transactions() {
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || t('error_occurred'));
+    } finally {
+      setIsDeleteConfirmOpen(false);
+      setPostToDeleteId(null);
     }
   };
 
@@ -2783,6 +2792,41 @@ export default function Transactions() {
                   {t('submit_repayment_receipt')}
                 </>
               )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <DialogContent className="max-w-md w-[90%] mx-auto bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-800 dark:border-white/10 rounded-2xl p-6 backdrop-blur-xl animate-in fade-in duration-300">
+          <DialogHeader className="space-y-3">
+            <div className="mx-auto w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center border border-rose-500/20">
+              <AlertTriangle className="w-6 h-6 text-rose-500" />
+            </div>
+            <DialogTitle className="text-center text-base font-black tracking-tight text-white leading-tight">
+              {t('delete_post_confirm')}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2.5">
+            <p className="text-center text-xs font-bold text-slate-400 leading-relaxed px-1">
+              {t('delete_post_warn_msg')}
+            </p>
+          </div>
+          <div className="flex gap-3 pt-3 border-t border-slate-800/80">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDeleteConfirmOpen(false)}
+              className="flex-1 h-11 rounded-xl border-slate-800 bg-transparent text-slate-400 hover:text-white hover:bg-slate-800/50 font-bold text-xs active:scale-95 transition-transform"
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmDeletePost}
+              className="flex-1 h-11 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs shadow-lg shadow-rose-600/20 active:scale-95 transition-all flex items-center justify-center"
+            >
+              {t('delete')}
             </Button>
           </div>
         </DialogContent>

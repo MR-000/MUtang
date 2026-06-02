@@ -443,7 +443,21 @@ export const translations: Dictionary = {
     tl: "Offline ang network. Ipinapakita ang local cached data.",
     ko: "네트워크 연결 오프라인. 오프라인 로컬 캐시 데이터를 표시 중입니다.",
     zh: "网络断开。正在显示本地缓存数据。",
-    ja: "ネットワークオフライン。オフラインローカルキャッシュデータを表示しています。"
+    ja: "ネットワークオフライン。오프라인 로컬 캐시 데이터를 표시하고 있습니다."
+  },
+  delete_post_confirm: {
+    en: "Are you sure you want to delete and cancel this credit post?",
+    tl: "Sigurado ka bang gusto mong i-delete at kanselahin ang post na ito?",
+    ko: "정말로 해당 외상거래 공고를 삭제 및 취소하시겠습니까?",
+    zh: "您确定要删除并取消该信贷公告吗？",
+    ja: "本当にこの外貨取引掲載を削除およびキャンセルしますか？"
+  },
+  delete_post_warn_msg: {
+    en: "This action cannot be undone, and the post will immediately disappear from the marketplace.",
+    tl: "Hindi na ito mababago, at mawawala agad ang post sa marketplace.",
+    ko: "이 작업은 되돌릴 수 없으며, 등록된 공고가 마켓플레이스에서 즉시 사라집니다.",
+    zh: "此操作无法撤销，发布的公告将立即从市场中消失。",
+    ja: "この操作は取り消せず、掲載された内容はマーケットプレイスから即座に削除されます。"
   },
 };
 export const getTranslation = (key: string, lang: Language) => { return translations[key]?.[lang] || translations[key]?.['en'] || key; };
