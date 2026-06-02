@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { translations } from '@/lib/i18n';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
@@ -188,14 +189,12 @@ export default function Transactions() {
       // 현지어 계약 문안 및 영어 계약 문안 조립
       const localDesc = getSmartTranslatedText(loan.description, t);
       const enDesc = getSmartTranslatedText(loan.description, (key: string) => {
-        const { translations } = require('@/lib/i18n');
-        return translations[key]?.['en'] || translations[key]?.['en'] || key;
+        return translations[key]?.['en'] || key;
       });
 
       const localPolicy = getSmartTranslatedText(loan.overdue_policy, t);
       const enPolicy = getSmartTranslatedText(loan.overdue_policy, (key: string) => {
-        const { translations } = require('@/lib/i18n');
-        return translations[key]?.['en'] || translations[key]?.['en'] || key;
+        return translations[key]?.['en'] || key;
       });
 
       // 현지어 라벨들
