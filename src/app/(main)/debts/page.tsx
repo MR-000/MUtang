@@ -126,11 +126,22 @@ const getSmartTranslatedText = (text: string | null | undefined, t: any): string
     prefix = `[${prefixContent}] `;
   }
 
-  const cleanBody = mainBody.trim();
+  let cleanBody = mainBody.trim();
   if (hardcodedMap[cleanBody]) {
     mainBody = t(hardcodedMap[cleanBody]);
   } else {
-    mainBody = t(cleanBody);
+    const rateLabel = t('interest_rate_label') || '이율';
+    const overdueLabel = t('overdue_rules_label') || '연체규정';
+    
+    mainBody = cleanBody.replace(/\(이율:\s*(\d+(?:\.\d+)?%)\s*,\s*연체규정:\s*([^)]+)\)/gi, (_, rate, policy) => {
+      const policyKey = policy.trim();
+      const translatedPolicy = t(policyKey) || policyKey;
+      return `(${rateLabel}: ${rate}, ${overdueLabel}: ${translatedPolicy})`;
+    });
+
+    if (mainBody === cleanBody) {
+      mainBody = t(cleanBody);
+    }
   }
 
   return prefix + mainBody;
@@ -534,6 +545,8 @@ export default function Transactions() {
   const [isAdjustable, setIsAdjustable] = useState(false);
   const [periodValue, setPeriodValue] = useState('30'); // '1'~'31', '30'(1개월), '60'(2개월), '90'(3개월), 'custom'
   const [customPeriodDays, setCustomPeriodDays] = useState('');
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
 
   // ID & Selfie Photos
   const [idPhotos, setIdPhotos] = useState<Record<string, { file: File | null; preview: string | null; publicUrl?: string | null }>>({
@@ -625,6 +638,7 @@ export default function Transactions() {
       // 'lender' tab shows offers (posted by lenders, borrower_id is null)
       
       let query;
+      const todayStr = new Date().toISOString().split('T')[0];
 
       if (matchingType === 'borrower') {
         query = supabase
@@ -645,6 +659,9 @@ export default function Transactions() {
           .eq('status', 'pending')
           .is('borrower_id', null);
       }
+
+      // 만기일이 오늘 이후이거나 아예 지정되지 않은(null) 공고들만 출력
+      query = query.or(`due_date.gte.${todayStr},due_date.is.null`);
 
       const { data, error } = await query.order('created_at', { ascending: false });
 
@@ -707,7 +724,67 @@ export default function Transactions() {
     setCoinType('usdt');
   };
 
+  const handleEditPost = (req: MatchingRequest) => {
+    setAmount(req.amount.toString());
+    setInterestRate((req.interest_rate || 0).toString());
+    
+    let cleanDesc = req.description || '';
+    const prefixMatch = cleanDesc.match(/^(\[[^\]]+\])\s*(.*)$/);
+    if (prefixMatch) {
+      cleanDesc = prefixMatch[2];
+    }
+    setDescription(cleanDesc);
 
+    const rawPolicy = req.overdue_policy || 'overdue_policy_3';
+    const hardcodedMap: Record<string, string> = {
+      "기한 내 미납 시 일일 1%의 연체료 지불을 약속합니다.": "overdue_policy_1",
+      "연체 시 일일 0.8%의 연체료가 부과됨에 동의합니다.": "overdue_policy_2",
+      "연체 시 필리핀 법정 지연이자율 연 6% 이하 부과": "overdue_policy_3",
+      "연체 시 매일 1% 연체료 부과": "overdue_policy_4",
+      "연체 시 연 5% 지연이자율 적용": "overdue_policy_5",
+      "연체 시 연 24% 법정 지연손해금 적용": "overdue_policy_6"
+    };
+
+    let policyKey = rawPolicy;
+    if (hardcodedMap[rawPolicy]) {
+      policyKey = hardcodedMap[rawPolicy];
+    }
+
+    setOverduePolicy(policyKey);
+
+    if (['overdue_policy_3', 'overdue_policy_5', 'overdue_policy_6'].includes(policyKey)) {
+      setPolicyType(policyKey);
+      setCustomPolicy('');
+    } else {
+      setPolicyType('custom');
+      setCustomPolicy(policyKey);
+    }
+
+    setDueDate(req.due_date || '');
+    setIsEditMode(true);
+    setEditingPostId(req.id);
+    setMatchingType(req.type as 'borrower' | 'lender');
+    setIsPostModalOpen(true);
+  };
+
+  const handleDeletePost = async (id: string) => {
+    const confirmDelete = window.confirm("정말로 해당 외상거래 공고를 삭제 및 취소하시겠습니까?");
+    if (!confirmDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('matching_requests')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success(t('toast_post_deleted') || '공고가 성공적으로 삭제되었습니다.');
+      fetchMarketplace();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || t('error_occurred'));
+    }
+  };
 
   const handleStartTransaction = (req: MatchingRequest) => {
     setSelectedRequest(req);
@@ -832,24 +909,43 @@ export default function Transactions() {
       
       finalDescription = badgePrefix + finalDescription;
 
-      const { data, error } = await supabase
-        .from('matching_requests')
-        .insert([{
-          amount: parsedAmount,
-          interest_rate: parsedInterest,
-          description: finalDescription || null,
-          due_date: calculatedDueDate,
-          overdue_policy: overduePolicy || null,
-          status: 'pending',
-          type: matchingType,
-          borrower_id: isBorrower ? user?.id : null,
-          lender_id: !isBorrower ? user?.id : null
-        }])
-        .select();
+      let queryExec;
+
+      if (isEditMode && editingPostId) {
+        queryExec = supabase
+          .from('matching_requests')
+          .update({
+            amount: parsedAmount,
+            interest_rate: parsedInterest,
+            description: finalDescription || null,
+            due_date: calculatedDueDate,
+            overdue_policy: overduePolicy || null,
+            type: matchingType
+          })
+          .eq('id', editingPostId)
+          .select();
+      } else {
+        queryExec = supabase
+          .from('matching_requests')
+          .insert([{
+            amount: parsedAmount,
+            interest_rate: parsedInterest,
+            description: finalDescription || null,
+            due_date: calculatedDueDate,
+            overdue_policy: overduePolicy || null,
+            status: 'pending',
+            type: matchingType,
+            borrower_id: isBorrower ? user?.id : null,
+            lender_id: !isBorrower ? user?.id : null
+          }])
+          .select();
+      }
+
+      const { data, error } = await queryExec;
 
       if (error) throw error;
 
-      toast.success(t('toast_post_registered'));
+      toast.success(isEditMode ? (t('toast_post_updated') || '공고가 성공적으로 수정되었습니다.') : t('toast_post_registered'));
       setIsPostModalOpen(false);
       resetTransactionForm();
       fetchMarketplace();
@@ -1308,12 +1404,29 @@ export default function Transactions() {
                         </p>
                       </div>
                     </div>
-                    <Button 
-                      onClick={() => handleStartTransaction(req)}
-                      className="bg-slate-900 dark:bg-white dark:text-slate-950 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 transition-colors rounded-xl font-black px-3.5 h-9 text-xs shadow-md active:scale-95 shrink-0"
-                    >
-                      {t('transact')}
-                    </Button>
+                    {req.borrower_id === user?.id || req.lender_id === user?.id ? (
+                      <div className="flex gap-1 shrink-0">
+                        <Button 
+                          onClick={() => handleEditPost(req)}
+                          className="bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 text-slate-800 dark:text-white rounded-xl font-bold px-3 h-9 text-[11px] active:scale-95 transition-transform"
+                        >
+                          {t('edit') || '수정'}
+                        </Button>
+                        <Button 
+                          onClick={() => handleDeletePost(req.id)}
+                          className="bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-bold px-3 h-9 text-[11px] active:scale-95 transition-transform"
+                        >
+                          {t('delete') || '삭제'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button 
+                        onClick={() => handleStartTransaction(req)}
+                        className="bg-slate-900 dark:bg-white dark:text-slate-950 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 transition-colors rounded-xl font-black px-3.5 h-9 text-xs shadow-md active:scale-95 shrink-0"
+                      >
+                        {t('transact')}
+                      </Button>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
