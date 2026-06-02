@@ -785,20 +785,31 @@ export default function Transactions() {
   };
 
   const handleConfirmDeletePost = async () => {
-    if (!postToDeleteId) return;
+    console.log("handleConfirmDeletePost triggered with id:", postToDeleteId);
+    if (!postToDeleteId) {
+      toast.error(t('error_occurred') || "삭제할 공고 ID가 존재하지 않습니다.");
+      return;
+    }
 
     try {
+      // Optimistic UI Update: 서버 응답 지연을 방지하기 위해 로컬 state에서 즉시 제거
+      setRequests(prev => prev.filter(r => r.id !== postToDeleteId));
+      
       const { error } = await supabase
         .from('matching_requests')
         .delete()
         .eq('id', postToDeleteId);
 
       if (error) throw error;
+      
       toast.success(t('toast_post_deleted') || '공고가 성공적으로 삭제되었습니다.');
+      // 백그라운드 서버 데이터 최종 재동기화
       fetchMarketplace();
     } catch (err: any) {
-      console.error(err);
+      console.error("Post deletion fatal error:", err);
       toast.error(err.message || t('error_occurred'));
+      // 실패 시 마켓플레이스 데이터 롤백 리로드
+      fetchMarketplace();
     } finally {
       setIsDeleteConfirmOpen(false);
       setPostToDeleteId(null);
