@@ -4,6 +4,7 @@ export const translations: Dictionary = {
   dashboard: { en: 'Dashboard', tl: 'Dashboard', ko: '대시보드', zh: '仪表板', ja: 'ダッシュボード' },
   customers: { en: 'Customers', tl: 'Mga Customer', ko: '고객 관리', zh: '客户', ja: '顧客管理' },
   debts: { en: 'Credit Transactions', tl: 'Mga Transaksyon sa Utang', ko: '외상 거래', zh: '信贷交易', ja: '外貨取引' },
+  within: { en: 'within', tl: 'loob ng', ko: '이내', zh: '以内', ja: '以内' },
   marketplace: { en: 'Marketplace', tl: 'Marketplace', ko: '마켓플레이스', zh: '市场', ja: 'マーケットプレイス' },
   settings: { en: 'Settings', tl: 'Settings', ko: '설정', zh: '设置', ja: '設定' },
   admin: { en: 'Admin', tl: 'Admin', ko: '관리자', zh: '管理员', ja: '管理者' },

@@ -153,7 +153,7 @@ export default function MLIDCamera({ mode, onCapture, onClose, t }: MLIDCameraPr
           playsInline
         />
 
-        {/* Scan Guide Frame Overlay */}
+         {/* Scan Guide Frame Overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
           {mode === 'id' ? (
             /* ID Card Frame */
@@ -183,31 +183,33 @@ export default function MLIDCamera({ mode, onCapture, onClose, t }: MLIDCameraPr
           )}
 
           {/* AI Subtitle Overlay */}
-          <div className="absolute bottom-8 text-center w-full px-6">
+          <div className="absolute bottom-[160px] text-center w-full px-6">
             <p className="text-[9px] font-extrabold tracking-wider text-slate-300 bg-blue-950/60 border border-blue-500/20 py-2 px-4 rounded-xl inline-block backdrop-blur-md animate-pulse">
               {analyzingText}
             </p>
           </div>
+
+          {/* Capture Button Right Below Guide Overlay (pointer-events-auto allowed) */}
+          <div className="absolute bottom-[40px] inset-x-0 flex flex-col items-center gap-4 justify-center pointer-events-auto w-full">
+            <div className="flex items-center gap-8">
+              <button
+                onClick={switchCamera}
+                className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-all active:scale-90"
+              >
+                <RefreshCcw className="w-5 h-5" />
+              </button>
+
+              <button
+                onClick={capturePhoto}
+                className="w-20 h-20 rounded-full bg-blue-600 hover:bg-blue-500 border-4 border-white/40 active:scale-90 transition-all flex items-center justify-center text-white shadow-xl shadow-blue-500/20"
+              >
+                <Camera className="w-8 h-8" />
+              </button>
+
+              <div className="w-12 h-12"></div> {/* Spacer */}
+            </div>
+          </div>
         </div>
-      </div>
-
-      {/* Footer Controls Overlay */}
-      <div className="bg-slate-950 px-6 pt-6 pb-24 flex items-center justify-between z-30 border-t border-white/5 shrink-0">
-        <div className="w-16"></div> {/* Spacer to center the capture button */}
-        
-        <button
-          onClick={capturePhoto}
-          className="w-20 h-20 rounded-full bg-blue-600 hover:bg-blue-500 border-4 border-white/20 active:scale-90 transition-all flex items-center justify-center text-white shadow-xl shadow-blue-500/20"
-        >
-          <Camera className="w-8 h-8" />
-        </button>
-
-        <button
-          onClick={switchCamera}
-          className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-all active:scale-90"
-        >
-          <RefreshCcw className="w-5 h-5" />
-        </button>
       </div>
     </div>
   );

@@ -738,22 +738,22 @@ export default function Transactions() {
       let calculatedDueDate: string | null = null;
       let durationText = '';
 
+      // period 방식에 따른 다국어 텍스트 처리
       if (dueDateType === 'fixed') {
         calculatedDueDate = dueDate || null;
       } else {
-        // period 방식
         let daysToAdd = 30; // 기본값 30일 (1개월)
         if (periodValue === 'custom') {
           const customDays = parseInt(customPeriodDays || '30', 10);
           daysToAdd = isNaN(customDays) || customDays <= 0 ? 30 : customDays;
-          durationText = `${daysToAdd}일`;
+          durationText = `${daysToAdd}${t('days') || '일'}`;
         } else {
           const pVal = parseInt(periodValue, 10);
           daysToAdd = isNaN(pVal) ? 30 : pVal;
-          if (periodValue === '30') durationText = '1개월';
-          else if (periodValue === '60') durationText = '2개월';
-          else if (periodValue === '90') durationText = '3개월';
-          else durationText = `${daysToAdd}일`;
+          if (periodValue === '30') durationText = `1${t('month') || '개월'}`;
+          else if (periodValue === '60') durationText = `2${t('months') || '개월'}`;
+          else if (periodValue === '90') durationText = `3${t('months') || '개월'}`;
+          else durationText = `${daysToAdd}${t('days') || '일'}`;
         }
 
         // 오늘 기준으로 일수 더하기
@@ -762,18 +762,22 @@ export default function Transactions() {
         calculatedDueDate = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD 포맷
       }
 
-      // 설명 문구에 기일 정보 및 조정 가능 옵션을 접두어로 조립
+      // 설명 문구에 기일 정보 및 조정 가능 옵션을 접두어로 조립 (다국어화 반영)
       let finalDescription = description || '';
       let badgePrefix = '';
       if (dueDateType === 'period') {
-        badgePrefix = `[만기: ${durationText} 이내`;
+        const dueText = t('due_date') || '만기';
+        const insideText = t('within') || '이내';
+        const adjustText = t('due_date_adjustable') || '기일 조정 가능';
+        badgePrefix = `[${dueText}: ${durationText} ${insideText}`;
         if (isAdjustable) {
-          badgePrefix += ' / 기일 조정 가능';
+          badgePrefix += ` / ${adjustText}`;
         }
         badgePrefix += '] ';
       } else {
         if (isAdjustable) {
-          badgePrefix = '[기일 조정 가능 ';
+          const adjustText = t('due_date_adjustable') || '기일 조정 가능';
+          badgePrefix = `[${adjustText}] `;
         }
       }
       

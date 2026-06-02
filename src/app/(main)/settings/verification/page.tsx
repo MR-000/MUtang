@@ -382,41 +382,45 @@ export default function VerificationPage() {
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-white dark:bg-slate-950 px-6 py-8 pb-32">
-      <header className="flex items-center justify-between mb-12">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="rounded-full" 
-          onClick={() => {
-            if (step > 0) {
-              if (step === 6) {
-                setStep(0);
-                setVerificationData(d => ({ ...d, photos: [] }));
-              } else {
-                setStep(prev => prev - 1);
-                setVerificationData(prev => ({
-                  ...prev,
-                  photos: prev.photos.slice(0, -1)
-                }));
-              }
-            } else {
-              if (window.history.length > 1) {
-                router.back();
-              } else {
-                router.push('/settings');
-              }
-            }
-          }}
-        >
-          <ChevronLeft className="w-8 h-8" />
-        </Button>
-        <span className="font-black uppercase tracking-widest text-xs opacity-50">{t('kyc_verification_title')}</span>
-        <div className="w-10" />
-      </header>
+      {!isCameraOpen && (
+        <>
+          <header className="flex items-center justify-between mb-12">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="rounded-full" 
+              onClick={() => {
+                if (step > 0) {
+                  if (step === 6) {
+                    setStep(0);
+                    setVerificationData(d => ({ ...d, photos: [] }));
+                  } else {
+                    setStep(prev => prev - 1);
+                    setVerificationData(prev => ({
+                      ...prev,
+                      photos: prev.photos.slice(0, -1)
+                    }));
+                  }
+                } else {
+                  if (window.history.length > 1) {
+                    router.back();
+                  } else {
+                    router.push('/settings');
+                  }
+                }
+              }}
+            >
+              <ChevronLeft className="w-8 h-8" />
+            </Button>
+            <span className="font-black uppercase tracking-widest text-xs opacity-50">{t('kyc_verification_title')}</span>
+            <div className="w-10" />
+          </header>
 
-      <div className="transition-all duration-300">
-        {renderStep()}
-      </div>
+          <div className="transition-all duration-300">
+            {renderStep()}
+          </div>
+        </>
+      )}
 
       {isCameraOpen && (
         <MLIDCamera 
