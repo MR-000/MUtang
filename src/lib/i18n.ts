@@ -420,5 +420,30 @@ export const translations: Dictionary = {
   borrower_label: { en: "Borrower", tl: "Mangungutang", ko: "채무자", zh: "借款人", ja: "債務者" },
   financial_terms_title: { en: "Financial Terms & Repayment Info", tl: "Mga Termino sa Pananalapi at Impormasyon ng Pagbabayad", ko: "거래 금융 조건 및 상환 정보", zh: "金融条款与还款信息", ja: "取引金融条件および返済情報" },
   signature_not_registered: { en: "Not Registered", tl: "Hindi Pa Nairehistro", ko: "서명 미등록", zh: "未注册", ja: "未登録" },
+  security_warning_duplicate_front: {
+    en: "Security Alert: The same file has been detected for the 1st ID Front and 2nd ID Front. Please capture two different physical IDs.",
+    tl: "Security Alert: Nakita ang parehong file sa Unang ID Harap at Pangalawang ID Harap. Kunan ng larawan ang dalawang magkaibang ID.",
+    ko: "보안 위반 경고: 1차 신분증 앞면과 2차 신분증 앞면 이미지에 동일한 파일이 감지되었습니다. 서로 다른 2개의 실물 신분증을 촬영해 주세요.",
+    zh: "安全警报：在第一张身份证正面和第二张身份证正面检测到同一个文件。请拍摄两张不同的实物身份证。",
+    ja: "セキュリティ警告：1枚目の身分証表面と2枚目の身分証表面に同一ファイルが検出されました. 異なる2枚の実物身分証を撮影してください."
+  },
+  security_warning_duplicate_back: {
+    en: "Security Alert: The same file has been detected for the 1st ID Back and 2nd ID Back. Please capture two different physical IDs.",
+    tl: "Security Alert: Nakita ang parehong file sa Unang ID Likod at Pangalawang ID Likod. Kunan ng larawan ang dalawang magkaibang ID.",
+    ko: "보안 위반 경고: 1차 신분증 뒷면과 2차 신분증 뒷면 이미지에 동일한 파일이 감지되었습니다. 서로 다른 2개의 실물 신분증을 촬영해 주세요.",
+    zh: "安全警报：在第一张身份证背面和第二张身份证背面检测到同一个文件。请拍摄两张不同的实物身份证。",
+    ja: "セキュリティ警告：1枚目の身分証裏面과 2枚目の身分証裏面に 동일 파일이 검출되었습니다. 다른 2枚의 실물 신분증을 촬영해 주세요."
+  },
+  close_proof: { en: "Close Proof", tl: "I-close ang Katibayan", ko: "증빙 닫기", zh: "关闭凭证", ja: "証明を閉じる" },
+  view_proof_photos: { en: "View Proof Photos", tl: "Tingnan ang Katibayan", ko: "증빙 사진 열람", zh: "查看凭证照片", ja: "証明写真を表示" },
+  no_signature: { en: "No Signature", tl: "Walang Lagda", ko: "서명 없음", zh: "无签名", ja: "署名なし" },
+  repay_with_gcash: { en: "Repay with GCash (PHP {amount})", tl: "Magbayad gamit ang GCash (PHP {amount})", ko: "GCash로 상환하기 (PHP {amount})", zh: "使用 GCash 还款 (PHP {amount})", ja: "GCashで返済する (PHP {amount})" },
+  viewing_cached_data: {
+    en: "Network offline. Displaying local cached data.",
+    tl: "Offline ang network. Ipinapakita ang local cached data.",
+    ko: "네트워크 연결 오프라인. 오프라인 로컬 캐시 데이터를 표시 중입니다.",
+    zh: "网络断开。正在显示本地缓存数据。",
+    ja: "ネットワークオフライン。オフラインローカルキャッシュデータを表示しています。"
+  },
 };
 export const getTranslation = (key: string, lang: Language) => { return translations[key]?.[lang] || translations[key]?.['en'] || key; };

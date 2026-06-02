@@ -105,15 +105,23 @@ const getSmartTranslatedText = (text: string | null | undefined, t: any): string
     mainBody = prefixMatch[2];
     
     let prefixContent = prefix.slice(1, -1);
-    prefixContent = prefixContent
-      .replace("만기:", t("due_date") + ":")
-      .replace("1개월 이내", "1 " + t("month"))
-      .replace("2개월 이내", "2 " + t("months"))
-      .replace("3개월 이내", "3 " + t("months"))
-      .replace("30일 이내", "30 " + t("days"))
-      .replace("60일 이내", "60 " + t("days"))
-      .replace("90일 이내", "90 " + t("days"))
-      .replace("기일 조정 가능", t("due_date_adjustable"));
+    
+    // 1. 만기/Due Date/Takdang Petsa 통합 치환
+    prefixContent = prefixContent.replace(/^(만기|Due Date|Takdang Petsa):/i, t("due_date") + ":");
+    
+    // 2. "일 이내" 또는 "days within" 동적 치환 (예: 10일 이내)
+    prefixContent = prefixContent.replace(/(\d+)\s*(일\s*이내|days?\s*within|araw\s*loob ng)/i, (_, num) => {
+      return `${num} ${t("days")} ${t("within")}`;
+    });
+    
+    // 3. "개월 이내" 또는 "months within" 동적 치환
+    prefixContent = prefixContent.replace(/(\d+)\s*(개월\s*이내|months?\s*within|buwan\s*loob ng)/i, (_, num) => {
+      const unit = parseInt(num, 10) === 1 ? t("month") : t("months");
+      return `${num} ${unit} ${t("within")}`;
+    });
+    
+    // 4. "기일 조정 가능" 동적 치환
+    prefixContent = prefixContent.replace(/(기일 조정 가능|Adjustable Due Date|Maaaring Ayusin ang Takdang Petsa)/i, t("due_date_adjustable"));
       
     prefix = `[${prefixContent}] `;
   }
@@ -435,17 +443,10 @@ export default function Transactions() {
 
       // html2pdf가 전역 스타일시트 내 oklch()를 읽어서 오류를 뱉는 것을 근본적으로 차단하기 위해
       // pdf 변환 직전 전역 스타일에서 oklch 단어를 포함한 stylesheet를 일시적으로 비활성화 후 복원
-      const activeStylesheets: HTMLLinkElement[] = [];
       const activeStyleTags: HTMLStyleElement[] = [];
       
       try {
-        // link 태그 및 style 태그 필터링 비활성화
-        document.querySelectorAll('link[rel="stylesheet"]').forEach((el: any) => {
-          if (el.href && !el.disabled) {
-            el.disabled = true;
-            activeStylesheets.push(el);
-          }
-        });
+        // oklch를 포함한 style 태그만 비활성화 (Next.js layout CSS 링크 비활성화로 인한 404 차단)
         document.querySelectorAll('style').forEach((el: any) => {
           if (!el.disabled && el.innerHTML.includes('oklch')) {
             el.disabled = true;
@@ -459,7 +460,6 @@ export default function Transactions() {
       const pdfBlob = await html2pdf().from(container).set(opt).outputPdf('blob');
 
       // 비활성화했던 스타일시트 즉각 원상복구 (화면 깨짐 방지)
-      activeStylesheets.forEach(el => el.disabled = false);
       activeStyleTags.forEach(el => el.disabled = false);
 
       const pdfFile = new File([pdfBlob], `Agreement_${loan.id}.pdf`, { type: 'application/pdf' });
@@ -650,8 +650,22 @@ export default function Transactions() {
 
       if (error) throw error;
       setRequests(data || []);
+      if (data && typeof window !== 'undefined') {
+        localStorage.setItem(`utang_cache_marketplace_${matchingType}`, JSON.stringify(data));
+      }
     } catch (e) {
       console.error(e);
+      if (typeof window !== 'undefined') {
+        try {
+          const cached = localStorage.getItem(`utang_cache_marketplace_${matchingType}`);
+          if (cached) {
+            setRequests(JSON.parse(cached));
+            toast.info(t('viewing_cached_data'));
+          }
+        } catch (cacheErr) {
+          console.error(cacheErr);
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -860,12 +874,12 @@ export default function Transactions() {
     const back2Url = idPhotos.back2?.publicUrl || idPhotos.back2?.preview;
 
     if (front1Url && front2Url && front1Url === front2Url) {
-      toast.error('보안 위반 경고: 1차 신분증 앞면과 2차 신분증 앞면 이미지에 동일한 파일이 감지되었습니다. 서로 다른 2개의 실물 신분증을 촬영해 주세요.', { duration: 6000 });
+      toast.error(t('security_warning_duplicate_front'), { duration: 6000 });
       return;
     }
 
     if (back1Url && back2Url && back1Url === back2Url) {
-      toast.error('보안 위반 경고: 1차 신분증 뒷면과 2차 신분증 뒷면 이미지에 동일한 파일이 감지되었습니다. 서로 다른 2개의 실물 신분증을 촬영해 주세요.', { duration: 6000 });
+      toast.error(t('security_warning_duplicate_back'), { duration: 6000 });
       return;
     }
     
@@ -946,8 +960,22 @@ export default function Transactions() {
 
       if (error) throw error;
       setDebts(data || []);
+      if (data && typeof window !== 'undefined') {
+        localStorage.setItem('utang_cache_debts', JSON.stringify(data));
+      }
     } catch (e: any) {
       console.error(e);
+      if (typeof window !== 'undefined') {
+        try {
+          const cached = localStorage.getItem('utang_cache_debts');
+          if (cached) {
+            setDebts(JSON.parse(cached));
+            toast.info(t('viewing_cached_data'));
+          }
+        } catch (cacheErr) {
+          console.error(cacheErr);
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -1159,14 +1187,14 @@ export default function Transactions() {
           <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-xl backdrop-blur-sm">
             <button 
               onClick={() => setActiveTab('marketplace')}
-              className={`px-3.5 py-1.5 rounded-lg text-[10px] font-black transition-all duration-300 flex items-center gap-1.5 ${activeTab === 'marketplace' ? 'bg-white dark:bg-blue-600 shadow-md text-blue-600 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`h-11 px-4 rounded-xl text-xs font-black transition-all duration-300 flex items-center gap-1.5 ${activeTab === 'marketplace' ? 'bg-white dark:bg-blue-600 shadow-md text-blue-600 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}
             >
               <Users className="w-3.5 h-3.5" />
               {t('marketplace')}
             </button>
             <button 
               onClick={() => setActiveTab('history')}
-              className={`px-3.5 py-1.5 rounded-lg text-[10px] font-black transition-all duration-300 flex items-center gap-1.5 ${activeTab === 'history' ? 'bg-white dark:bg-blue-600 shadow-md text-blue-600 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`h-11 px-4 rounded-xl text-xs font-black transition-all duration-300 flex items-center gap-1.5 ${activeTab === 'history' ? 'bg-white dark:bg-blue-600 shadow-md text-blue-600 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}
             >
               <HistoryIcon className="w-3.5 h-3.5" />
               {t('history')}
@@ -1180,14 +1208,14 @@ export default function Transactions() {
               <Button 
                 variant={matchingType === 'borrower' ? 'default' : 'outline'}
                 onClick={() => setMatchingType('borrower')}
-                className={`flex-1 rounded-xl font-black h-9 text-xs shadow-sm transition-all ${matchingType === 'borrower' ? 'bg-blue-600 text-white' : 'border-slate-200 dark:border-white/10'}`}
+                className={`flex-1 rounded-xl font-black h-11 text-xs shadow-sm transition-all ${matchingType === 'borrower' ? 'bg-blue-600 text-white' : 'border-slate-200 dark:border-white/10'}`}
               >
                 {t('borrower_list')}
               </Button>
               <Button 
                 variant={matchingType === 'lender' ? 'default' : 'outline'}
                 onClick={() => setMatchingType('lender')}
-                className={`flex-1 rounded-xl font-black h-9 text-xs shadow-sm transition-all ${matchingType === 'lender' ? 'bg-blue-600 text-white' : 'border-slate-200 dark:border-white/10'}`}
+                className={`flex-1 rounded-xl font-black h-11 text-xs shadow-sm transition-all ${matchingType === 'lender' ? 'bg-blue-600 text-white' : 'border-slate-200 dark:border-white/10'}`}
               >
                 {t('lender_list')}
               </Button>
@@ -1200,11 +1228,11 @@ export default function Transactions() {
                     placeholder={t('search_users_placeholder')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 h-9 text-xs rounded-xl border-slate-200 dark:border-white/5 bg-white dark:bg-white/5 font-bold focus:ring-1 focus:ring-blue-500"
+                    className="pl-9 h-11 text-xs rounded-xl border-slate-200 dark:border-white/5 bg-white dark:bg-white/5 font-bold focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
                 <Button 
-                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl w-9 h-9 p-0 shadow-md active:scale-95 transition-transform shrink-0 flex items-center justify-center"
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl w-11 h-11 p-0 shadow-md active:scale-95 transition-transform shrink-0 flex items-center justify-center"
                 >
                   <Search className="w-4 h-4" />
                 </Button>
@@ -1411,7 +1439,7 @@ export default function Transactions() {
                         onClick={() => handleDownloadContractPDF(loan)}
                         disabled={isGeneratingPDF === loan.id}
                         variant="outline"
-                        className="flex-1 rounded-xl font-bold h-8 text-[11px] border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1.5 text-slate-700 dark:text-slate-200"
+                        className="flex-1 rounded-xl font-bold h-11 text-xs border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1.5 text-slate-700 dark:text-slate-200"
                       >
                         {isGeneratingPDF === loan.id ? t('preparing_pdf') : t('download_pdf')}
                       </Button>
@@ -1419,17 +1447,17 @@ export default function Transactions() {
                       <Button
                         onClick={() => toggleEvidence(loan.id)}
                         variant="outline"
-                        className="flex-1 rounded-xl font-bold h-8 text-[11px] border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1.5 text-slate-700 dark:text-slate-200"
+                        className="flex-1 rounded-xl font-bold h-11 text-xs border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1.5 text-slate-700 dark:text-slate-200"
                       >
                         {expandedEvidence[loan.id] ? (
                           <>
                             <EyeOff className="w-3.5 h-3.5" />
-                            <span>증빙 닫기</span>
+                            <span>{t('close_proof')}</span>
                           </>
                         ) : (
                           <>
                             <Eye className="w-3.5 h-3.5" />
-                            <span>증빙 사진 열람</span>
+                            <span>{t('view_proof_photos')}</span>
                           </>
                         )}
                       </Button>
@@ -1476,7 +1504,7 @@ export default function Transactions() {
                               {JSON.parse(loan.signature_data || '{}').lender ? (
                                 <img src={JSON.parse(loan.signature_data).lender} alt="Lender Signature" className="max-h-10 object-contain" />
                               ) : (
-                                <span className="text-[9px] text-slate-400 italic">서명 없음</span>
+                                <span className="text-[9px] text-slate-400 italic">{t('no_signature')}</span>
                               )}
                             </div>
                           </div>
@@ -1486,7 +1514,7 @@ export default function Transactions() {
                               {JSON.parse(loan.signature_data || '{}').borrower ? (
                                 <img src={JSON.parse(loan.signature_data).borrower} alt="Borrower Signature" className="max-h-10 object-contain" />
                               ) : (
-                                <span className="text-[9px] text-slate-400 italic">서명 없음</span>
+                                <span className="text-[9px] text-slate-400 italic">{t('no_signature')}</span>
                               )}
                             </div>
                           </div>
@@ -1631,7 +1659,7 @@ export default function Transactions() {
                         className="w-full h-14 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-blue-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
                       >
                         <Wallet className="w-5 h-5" />
-                        GCash로 상환하기 (PHP {Number(loan.repay_amount).toLocaleString()})
+                        {t('repay_with_gcash').replace('{amount}', Number(loan.repay_amount).toLocaleString())}
                       </Button>
                     );
                   })()}
