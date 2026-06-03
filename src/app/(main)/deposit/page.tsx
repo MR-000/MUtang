@@ -153,9 +153,39 @@ export default function DepositPage() {
         toast.error('입금증 정보 저장에 실패했습니다.');
       } else {
         setActiveRequest((prev: any) => prev ? { ...prev, proof_image_url: publicUrl } : null);
-        toast.success('입금증 업로드가 완료되었습니다!');
+        toast.success('입금증 업로드가 완료되었습니다! 실시간 영수증 분석을 시작합니다.');
         setProofFile(null);
         setProofPreview(null);
+
+        // OCR 검증 API 호출 트리거
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const token = session?.access_token;
+
+          const ocrRes = await fetch('/api/payments/ocr-verify', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': token ? `Bearer ${token}` : ''
+            },
+            body: JSON.stringify({
+              requestId: activeRequest.id,
+              imageUrl: publicUrl
+            })
+          });
+
+          const ocrData = await ocrRes.json();
+          if (ocrRes.ok && ocrData.success) {
+            toast.success('영수증이 자동으로 분석되어 입금 확인 및 크레딧 충전이 즉시 완료되었습니다!');
+            setSuccess(true);
+          } else {
+            console.warn('[OCR 검증 실패]:', ocrData.message || ocrData.error);
+            toast.info(ocrData.message || '영수증 자동 판독에 실패했습니다. 관리자 수동 승인 대기 단계로 인계됩니다.');
+          }
+        } catch (ocrErr) {
+          console.error('[OCR 호출 실패]:', ocrErr);
+          toast.info('영수증 자동 판독 중 네트워크 통신 오류가 발생했습니다. 수동 승인 대기 처리됩니다.');
+        }
       }
     } catch (err: any) {
       toast.error(err.message);
