@@ -459,5 +459,19 @@ export const translations: Dictionary = {
     zh: "此操作无法撤销，发布的公告将立即从市场中消失。",
     ja: "この操作は取り消せず、掲載された内容はマーケットプレイスから即座に削除されます。"
   },
+  filter: { en: 'Filter', tl: 'Salain', ko: '필터', zh: '筛选', ja: 'フィルター' },
+  marketplace_subtitle: { en: 'Fund trust-backed loan requests directly from peer merchants.', tl: 'Magpondo ng mga trust-backed loan request mula sa mga kasamahang merchant.', ko: '동료 상인들의 신용 기반 대출 요청을 직접 지원하세요.', zh: '直接资助来自同行商户的信任背书贷款请求。', ja: '同僚の商人からの信頼ベースの融資要求に直接資金を提供します。' },
+  trust_investing: { en: 'Trust-based Matching', tl: 'Trust-based Matching', ko: '신뢰 기반 매칭', zh: '基于信任的匹配', ja: '信頼ベースのマッチング' },
+  trust_investing_desc: { en: 'Earn stable returns by supporting trusted small businesses in your community.', tl: 'Kumita ng matatag na kita sa pamamagitan ng pagsuporta sa mga pinagkakatiwalaang maliit na negosyo sa iyong komunidad.', ko: '지역 사회의 신뢰할 수 있는 소상공인을 지원하고 안정적인 수익을 얻으세요.', zh: '通过支持社区中值得信赖的小型企业获得稳定回报。', ja: '地域の信頼できる小規模ビジネス를サポートすることで、安定したリターンを得られます。' },
+  learn_more: { en: 'Learn More', tl: 'Dagdagan ang nalalaman', ko: '더 알아보기', zh: '了解更多', ja: '詳細を見る' },
+  secure_matches: { en: 'Verified Contracts', tl: 'Mga Na-verify na Kontrata', ko: '검증된 약정서', zh: '验证合同', ja: '検証済み契約' },
+  secure_matches_desc: { en: 'All transactions require dual signatures and verified government identity uploads.', tl: 'Ang lahat ng transaksyon ay nangangailangan ng dual signature at na-verify na government ID upload.', ko: '모든 거래는 양측 서명 및 정부 발급 신분증 인증이 필수로 요구됩니다.', zh: '所有交易都需要双重签名和验证政府身份上传。', ja: 'すべての取引には、双方の署名と政府発行の身分証明書のアップロードが必要です。' },
+  rls_protected: { en: 'Row-Level Security Active', tl: 'Aktibo ang Row-Level Security', ko: '행 레벨 보안 활성화됨', zh: '行级安全保护激活', ja: '行レベルセキュリティ有効' },
+  active_requests: { en: 'Active Requests', tl: 'Mga Aktibong Request', ko: '활성 대출 요청 목록', zh: '活跃请求', ja: 'アクティブなリクエスト' },
+  repaid: { en: 'Repaid', tl: 'Nabayaran na', ko: '상환 완료', zh: '已偿还', ja: '返済済み' },
+  funding_needed: { en: 'Funding Needed', tl: 'Kailangang Pondohan', ko: '필요 자금', zh: '所需资金', ja: '必要資金' },
+  fund_now: { en: 'Fund Now', tl: 'Pondohan Ngayon', ko: '자금 지원하기', zh: '立即资助', ja: '今すぐ資助' },
+  no_active_requests: { en: 'No active matching requests available at the moment.', tl: 'Walang magagamit na aktibong matching request sa kasalukuyan.', ko: '현재 활성화된 대출 요청이 없습니다.', zh: '目前没有活跃的匹配请求。', ja: '現在アクティブなマッチングリクエストはありません。' },
+  investment_request_sent: { en: 'Connecting to request by', tl: 'Kumokonekta sa request ni', ko: '다음 이용자의 거래로 연결 중:', zh: '正在连接请求自', ja: 'リクエストに接続中:' },
 };
 export const getTranslation = (key: string, lang: Language) => { return translations[key]?.[lang] || translations[key]?.['en'] || key; };

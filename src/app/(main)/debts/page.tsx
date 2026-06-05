@@ -142,15 +142,28 @@ const getSmartTranslatedText = (text: string | null | undefined, t: any): string
       "연체 시 일일 0.8%의 연체료가 부과됨에 동의합니다.": "overdue_policy_2",
     };
 
-    mainBody = cleanBody.replace(/\(이율:\s*(\d+(?:\.\d+)?%)\s*,\s*연체규정:\s*([^)]+)\)/gi, (_, rate, policy) => {
-      const policyKey = policy.trim();
-      const mappedKey = reversePolicyMap[policyKey] || policyKey;
-      const translatedPolicy = t(mappedKey) || policyKey;
+    // 공백, 줄바꿈(\n) 등을 제거하고 정규식으로 유연하게 매칭
+    // 예: (이율: 1%, 연체규정: 연체 시 필리핀 법정 지연이자율 연 6% 이하 부과)
+    mainBody = cleanBody.replace(/\(?이율:\s*(\d+(?:\.\d+)?%)\s*,\s*연체규정:\s*([\s\S]+?)\)?$/gi, (_, rate, policy) => {
+      let policyKey = policy.trim();
+      if (policyKey.endsWith(')')) {
+        policyKey = policyKey.slice(0, -1).trim();
+      }
+      // 줄바꿈이나 여러 공백을 단일 공백으로 치환하여 딕셔너리 키와 비교
+      const normalizedPolicyKey = policyKey.replace(/\s+/g, ' ');
+      const mappedKey = reversePolicyMap[normalizedPolicyKey] || normalizedPolicyKey;
+      const translatedPolicy = t(mappedKey) || normalizedPolicyKey;
       return `(${rateLabel}: ${rate}, ${overdueLabel}: ${translatedPolicy})`;
     });
 
     if (mainBody === cleanBody) {
-      mainBody = t(cleanBody);
+      // 바디가 완전히 치환되지 않았다면 전체 매칭 시도
+      const normalizedCleanBody = cleanBody.replace(/\s+/g, ' ');
+      if (hardcodedMap[normalizedCleanBody]) {
+        mainBody = t(hardcodedMap[normalizedCleanBody]);
+      } else {
+        mainBody = t(cleanBody);
+      }
     }
   }
 
@@ -158,7 +171,7 @@ const getSmartTranslatedText = (text: string | null | undefined, t: any): string
 };
 
 export default function Transactions() {
-  const { user, profile, t } = useAuth();
+  const { user, profile, t, language } = useAuth();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'marketplace' | 'history'>('marketplace');
@@ -176,45 +189,37 @@ export default function Transactions() {
   const [postToDeleteId, setPostToDeleteId] = useState<string | null>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<string | null>(null);
 
-  const loadHtml2PdfScript = (): Promise<any> => {
-    return new Promise((resolve, reject) => {
-      if ((window as any).html2pdf) {
-        resolve((window as any).html2pdf);
-        return;
-      }
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-      script.async = true;
-      script.onload = () => {
-        if ((window as any).html2pdf) {
-          resolve((window as any).html2pdf);
-        } else {
-          reject(new Error('html2pdf script load failed'));
-        }
-      };
-      script.onerror = () => reject(new Error('html2pdf script load error'));
-      document.body.appendChild(script);
-    });
-  };
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false);
 
-  const handleDownloadContractPDF = async (loan: any) => {
+  const handleDownloadContractPDF = async (loan: any, isPreview: boolean = false) => {
     if (!loan) return;
     setIsGeneratingPDF(loan.id);
     
     try {
-      const html2pdf = await loadHtml2PdfScript();
-      
-      // 서명 파싱 및 서명 데이터 공유 바인딩
+      // 서명 파싱 및 서명 데이터 공유 바인딩 (문자열/객체 호환 지원)
       let lenderSig = '';
       let borrowerSig = '';
       try {
         if (loan.signature_data) {
-          const sigs = JSON.parse(loan.signature_data);
+          const sigs = typeof loan.signature_data === 'string'
+            ? JSON.parse(loan.signature_data)
+            : loan.signature_data;
           lenderSig = sigs.lender || '';
           borrowerSig = sigs.borrower || '';
         }
       } catch (err) {
         console.error('Signature parse error:', err);
+      }
+
+      // verification_evidence 안전 파싱 (문자열/객체 호환 지원)
+      let evidence = loan.verification_evidence;
+      if (typeof evidence === 'string') {
+        try {
+          evidence = JSON.parse(evidence);
+        } catch (e) {
+          evidence = null;
+        }
       }
 
       // 현지어 계약 문안 및 영어 계약 문안 조립
@@ -228,284 +233,98 @@ export default function Transactions() {
         return translations[key]?.['en'] || key;
       });
 
-      // 현지어 라벨들
-      const localTitle = t('debts') + " " + t('transaction') + " " + t('agreement_record');
-      const enTitle = "Credit Transaction Agreement";
-
-      const localLender = t('lender') + " " + t('signature');
-      const enLender = "Lender Signature";
-
-      const localBorrower = t('borrower') + " " + t('signature');
-      const enBorrower = "Borrower Signature";
-
-      const localDate = t('post_date');
-      const enDate = "Transaction Date";
-
-      const localPrincipal = t('principal');
-      const enPrincipal = "Principal Amount";
-
-      const localInterest = t('interest_rate_label');
-      const enInterest = "Interest Rate";
-
-      const localRepay = t('repayment_amount');
-      const enRepay = "Repayment Amount";
-
-      const localDue = t('due_date');
-      const enDue = "Due Date";
-
-      const localDisclaimer = t('legal_disclaimer');
-      const enDisclaimer = "I hereby acknowledge that I have received the goods/services listed above and agree to repay the specified amount on or before the due date.";
-
-      const localTermsTitle = t('financial_terms_title') || '거래 가액 및 상세 상환 규정';
-      const localSignatureNotRegistered = t('signature_not_registered') || '서명 미등록';
-
-      // 임시 템플릿 DOM 생성 (듀얼 페이지 구조: 1페이지 현지어, 2페이지 영문)
-      const container = document.createElement('div');
-      container.style.padding = '40px';
-      container.style.color = '#0f172a';
-      container.style.backgroundColor = '#ffffff';
-      container.style.fontFamily = 'system-ui, -apple-system, sans-serif';
-      container.style.lineHeight = '1.6';
-      container.style.fontSize = '12px';
-      container.style.width = '800px';
-
-      container.innerHTML = `
-        <div style="page-break-after: always; padding-bottom: 20px;">
-          <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">
-            <h1 style="font-size: 20px; font-weight: 900; margin: 0; color: #1e3a8a;">${localTitle}</h1>
-            <p style="font-size: 9px; color: #64748b; margin: 5px 0 0 0;">Transaction ID: ${loan.id}</p>
-          </div>
-
-          <div style="margin-bottom: 25px; background-color: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #f1f5f9;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-              <tr>
-                <td style="padding: 6px 0; font-weight: bold; color: #64748b; width: 30%;">${t('lender')}:</td>
-                <td style="padding: 6px 0; font-weight: bold; color: #0f172a;">${loan.lender?.full_name || '-'} (${loan.lender?.phone || '-'})</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; font-weight: bold; color: #64748b;">${t('borrower')}:</td>
-                <td style="padding: 6px 0; font-weight: bold; color: #0f172a;">${loan.borrower?.full_name || '-'}</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; font-weight: bold; color: #64748b;">${localDate}:</td>
-                <td style="padding: 6px 0; font-weight: bold; color: #0f172a;">${format(new Date(loan.created_at), 'yyyy-MM-dd HH:mm')}</td>
-              </tr>
-            </table>
-          </div>
-
-          <div style="margin-bottom: 25px;">
-            <h3 style="font-size: 12px; font-weight: bold; border-left: 3px solid #3b82f6; padding-left: 8px; margin-bottom: 12px; color: #1e293b;">${localTermsTitle}</h3>
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; font-size: 11px;">
-              <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-                <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold; border-right: 1px solid #e2e8f0;">${localPrincipal}</th>
-                <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold; border-right: 1px solid #e2e8f0;">${localInterest}</th>
-                <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold; border-right: 1px solid #e2e8f0;">${localRepay}</th>
-                <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold;">${localDue}</th>
-              </tr>
-              <tr>
-                <td style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #e2e8f0;">PHP ${Number(loan.amount).toLocaleString()}</td>
-                <td style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #e2e8f0; color: #2563eb;">${loan.verification_evidence?.interest_rate || 0}%</td>
-                <td style="padding: 10px 12px; font-weight: 900; border-right: 1px solid #e2e8f0;">PHP ${Number(loan.repay_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                <td style="padding: 10px 12px; font-weight: bold; color: #e11d48;">${loan.due_date ? format(new Date(loan.due_date), 'yyyy-MM-dd') : '-'}</td>
-              </tr>
-            </table>
-          </div>
-
-          <div style="margin-bottom: 25px; background-color: #fafafa; border: 1px dashed #e2e8f0; padding: 15px; border-radius: 12px; font-size: 11px;">
-            <p style="margin: 0 0 8px 0;"><strong style="color: #64748b;">${t('transaction_description_label')}:</strong> <span style="font-weight: bold; color: #334155;">${localDesc}</span></p>
-            <p style="margin: 0;"><strong style="color: #64748b;">${t('overdue_rules_label')}:</strong> <span style="font-weight: bold; color: #dc2626;">${localPolicy}</span></p>
-          </div>
-
-          <div style="margin-bottom: 30px; padding: 15px; border: 1px solid #cbd5e1; border-radius: 12px; background-color: #f8fafc; font-size: 11px; text-align: justify; color: #475569;">
-            ${localDisclaimer}
-          </div>
-
-          <div style="display: flex; justify-content: space-between; margin-top: 40px; gap: 20px;">
-            <div style="flex: 1; text-align: center; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px; background-color: #ffffff;">
-              <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">${localLender}</p>
-              <div style="height: 90px; display: flex; align-items: center; justify-content: center;">
-                ${lenderSig ? `<img src="${lenderSig}" style="max-height: 80px; max-width: 100%; object-fit: contain;" />` : `<span style="color: #cbd5e1; font-style: italic;">${localSignatureNotRegistered}</span>`}
-              </div>
-              <p style="margin: 8px 0 0 0; font-size: 10px; font-weight: bold; color: #475569;">${loan.lender?.full_name || '-'}</p>
-            </div>
-            <div style="flex: 1; text-align: center; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px; background-color: #ffffff;">
-              <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">${localBorrower}</p>
-              <div style="height: 90px; display: flex; align-items: center; justify-content: center;">
-                ${borrowerSig ? `<img src="${borrowerSig}" style="max-height: 80px; max-width: 100%; object-fit: contain;" />` : `<span style="color: #cbd5e1; font-style: italic;">${localSignatureNotRegistered}</span>`}
-              </div>
-              <p style="margin: 8px 0 0 0; font-size: 10px; font-weight: bold; color: #475569;">${loan.borrower?.full_name || '-'}</p>
-            </div>
-          </div>
-        </div>
-
-        <div style="padding-top: 20px;">
-          <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">
-            <h1 style="font-size: 20px; font-weight: 900; margin: 0; color: #1e3a8a;">${enTitle}</h1>
-            <p style="font-size: 9px; color: #64748b; margin: 5px 0 0 0;">Transaction ID: ${loan.id}</p>
-          </div>
-
-          <div style="margin-bottom: 25px; background-color: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #f1f5f9;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-              <tr>
-                <td style="padding: 6px 0; font-weight: bold; color: #64748b; width: 30%;">Lender:</td>
-                <td style="padding: 6px 0; font-weight: bold; color: #0f172a;">${loan.lender?.full_name || '-'} (${loan.lender?.phone || '-'})</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; font-weight: bold; color: #64748b;">Borrower:</td>
-                <td style="padding: 6px 0; font-weight: bold; color: #0f172a;">${loan.borrower?.full_name || '-'}</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; font-weight: bold; color: #64748b;">${enDate}:</td>
-                <td style="padding: 6px 0; font-weight: bold; color: #0f172a;">${format(new Date(loan.created_at), 'yyyy-MM-dd HH:mm')}</td>
-              </tr>
-            </table>
-          </div>
-
-          <div style="margin-bottom: 25px;">
-            <h3 style="font-size: 12px; font-weight: bold; border-left: 3px solid #3b82f6; padding-left: 8px; margin-bottom: 12px; color: #1e293b;">Financial Terms and Conditions</h3>
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; font-size: 11px;">
-              <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-                <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold; border-right: 1px solid #e2e8f0;">${enPrincipal}</th>
-                <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold; border-right: 1px solid #e2e8f0;">${enInterest}</th>
-                <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold; border-right: 1px solid #e2e8f0;">${enRepay}</th>
-                <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: bold;">${enDue}</th>
-              </tr>
-              <tr>
-                <td style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #e2e8f0;">PHP ${Number(loan.amount).toLocaleString()}</td>
-                <td style="padding: 10px 12px; font-weight: bold; border-right: 1px solid #e2e8f0; color: #2563eb;">${loan.verification_evidence?.interest_rate || 0}%</td>
-                <td style="padding: 10px 12px; font-weight: 900; border-right: 1px solid #e2e8f0;">PHP ${Number(loan.repay_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                <td style="padding: 10px 12px; font-weight: bold; color: #e11d48;">${loan.due_date ? format(new Date(loan.due_date), 'yyyy-MM-dd') : '-'}</td>
-              </tr>
-            </table>
-          </div>
-
-          <div style="margin-bottom: 25px; background-color: #fafafa; border: 1px dashed #e2e8f0; padding: 15px; border-radius: 12px; font-size: 11px;">
-            <p style="margin: 0 0 8px 0;"><strong style="color: #64748b;">Description:</strong> <span style="font-weight: bold; color: #334155;">${enDesc}</span></p>
-            <p style="margin: 0;"><strong style="color: #64748b;">Overdue Rules:</strong> <span style="font-weight: bold; color: #dc2626;">${enPolicy}</span></p>
-          </div>
-
-          <div style="margin-bottom: 30px; padding: 15px; border: 1px solid #cbd5e1; border-radius: 12px; background-color: #f8fafc; font-size: 11px; text-align: justify; color: #475569;">
-            ${enDisclaimer}
-          </div>
-
-          <div style="display: flex; justify-content: space-between; margin-top: 40px; gap: 20px;">
-            <div style="flex: 1; text-align: center; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px; background-color: #ffffff;">
-              <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">${enLender}</p>
-              <div style="height: 90px; display: flex; align-items: center; justify-content: center;">
-                ${lenderSig ? `<img src="${lenderSig}" style="max-height: 80px; max-width: 100%; object-fit: contain;" />` : '<span style="color: #cbd5e1; font-style: italic;">No Signature</span>'}
-              </div>
-              <p style="margin: 8px 0 0 0; font-size: 10px; font-weight: bold; color: #475569;">${loan.lender?.full_name || '-'}</p>
-            </div>
-            <div style="flex: 1; text-align: center; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px; background-color: #ffffff;">
-              <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">${enBorrower}</p>
-              <div style="height: 90px; display: flex; align-items: center; justify-content: center;">
-                ${borrowerSig ? `<img src="${borrowerSig}" style="max-height: 80px; max-width: 100%; object-fit: contain;" />` : '<span style="color: #cbd5e1; font-style: italic;">No Signature</span>'}
-              </div>
-              <p style="margin: 8px 0 0 0; font-size: 10px; font-weight: bold; color: #475569;">${loan.borrower?.full_name || '-'}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* 3페이지: 법적 신원 증빙 자료 첨부 (신분증 4장 및 셀피) */}
-        <div style="page-break-before: always; padding-top: 20px;">
-          <div style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">
-            <h1 style="font-size: 16px; font-weight: 900; margin: 0; color: #1e3a8a;">Identity Verification Evidence</h1>
-            <p style="font-size: 8px; color: #64748b; margin: 2px 0 0 0;">Transaction Legal Security Records</p>
-          </div>
-          
-          <p style="font-size: 9px; color: #475569; margin-bottom: 20px; line-height: 1.5; font-weight: bold;">
-            The following documents were securely captured and verified through AI ML Kit scanning during transaction agreement to ensure the legal binding and non-repudiation of both parties.
-          </p>
-
-          <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; margin-bottom: 25px;">
-            ${['front1', 'back1', 'front2', 'back2'].map(key => {
-              const url = loan.verification_evidence?.photos?.[key];
-              const label = key.toUpperCase().replace('FRONT', 'ID Front ').replace('BACK', 'ID Back ');
-              if (!url) return '';
-              return `
-                <div style="text-align: center; width: 130px; border: 1px solid #e2e8f0; padding: 6px; border-radius: 8px; background-color: #ffffff;">
-                  <div style="height: 80px; display: flex; align-items: center; justify-content: center; background-color: #f8fafc; border-radius: 6px; overflow: hidden; margin-bottom: 4px;">
-                    <img src="${url}" style="max-height: 80px; max-width: 100%; object-fit: cover;" crossorigin="anonymous" />
-                  </div>
-                  <span style="font-size: 7px; font-weight: bold; color: #64748b; display: block;">${label}</span>
-                </div>
-              `;
-            }).join('')}
-            
-            ${(() => {
-              const url = loan.verification_evidence?.photos?.selfie;
-              if (!url) return '';
-              return `
-                <div style="text-align: center; width: 130px; border: 1px solid #e2e8f0; padding: 6px; border-radius: 8px; background-color: #ffffff;">
-                  <div style="height: 80px; display: flex; align-items: center; justify-content: center; background-color: #f8fafc; border-radius: 6px; overflow: hidden; margin-bottom: 4px;">
-                    <img src="${url}" style="max-height: 80px; max-width: 100%; object-fit: cover;" crossorigin="anonymous" />
-                  </div>
-                  <span style="font-size: 7px; font-weight: bold; color: #64748b; display: block;">LIVELINESS SELFIE</span>
-                </div>
-              `;
-            })()}
-          </div>
-        </div>
-      `;
-
-      const opt = {
-        margin: 0.1,
-        filename: `Agreement_${loan.id}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-          scale: 2, 
-          useCORS: true, 
-          letterRendering: true,
-          logging: false,
-          // html2canvas가 oklch 등 최신 CSS 함수를 파싱하다가 죽는 문제를 방지하기 위해
-          // 외부 스타일시트의 분석 시도를 차단하고 인라인 스타일만 온전히 그리도록 격리 유도
-          ignoreElements: (element: any) => false
+      const pdfPayload = {
+        id: loan.id,
+        lang: language || 'en',
+        lenderName: loan.lender?.full_name || '-',
+        lenderPhone: loan.lender?.phone || '-',
+        borrowerName: loan.borrower?.full_name || '-',
+        transactionDate: format(new Date(loan.created_at), 'yyyy-MM-dd HH:mm'),
+        amount: `PHP ${Number(loan.amount).toLocaleString()}`,
+        interestRate: `${evidence?.interest_rate || 0}%`,
+        repayAmount: `PHP ${Number(loan.repay_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        dueDate: loan.due_date ? format(new Date(loan.due_date), 'yyyy-MM-dd') : '-',
+        localTitle: t('debts') + " " + t('transaction') + " " + t('agreement_record'),
+        enTitle: "Credit Transaction Agreement",
+        localDescription: localDesc,
+        enDescription: enDesc,
+        localPolicy: localPolicy,
+        enPolicy: enPolicy,
+        localDisclaimer: t('legal_disclaimer'),
+        enDisclaimer: "I hereby acknowledge that I have received the goods/services listed above and agree to repay the specified amount on or before the due date.",
+        lenderSig,
+        borrowerSig,
+        photos: {
+          front1: evidence?.photos?.front1 || null,
+          back1: evidence?.photos?.back1 || null,
+          front2: evidence?.photos?.front2 || null,
+          back2: evidence?.photos?.back2 || null,
+          selfie: evidence?.photos?.selfie || null
         },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        labels: {
+          lender: t('lender') || '채권자',
+          borrower: t('borrower') || '채무자',
+          date: t('post_date') || '거래 일자',
+          termsTitle: t('financial_terms_title') || '거래 조건 및 세부 규칙',
+          principal: t('principal') || '원금',
+          interest: t('interest_rate_label') || '이율',
+          repayment: t('repayment_amount') || '상환 총액',
+          due: t('due_date') || '만기일',
+          lenderSignature: (t('lender') || '채권자') + " " + (t('signature') || '서명'),
+          borrowerSignature: (t('borrower') || '채무자') + " " + (t('signature') || '서명'),
+          noSignature: t('signature_not_registered') || '서명 미등록',
+          description: t('transaction_description_label') || '거래 내용',
+          overdue: t('overdue_rules_label') || '연체 규정'
+        }
       };
 
-      // html2pdf가 전역 스타일시트 내 oklch()를 읽어서 오류를 뱉는 것을 근본적으로 차단하기 위해
-      // pdf 변환 직전 전역 스타일에서 oklch 단어를 포함한 stylesheet를 일시적으로 비활성화 후 복원
-      const activeStyleTags: HTMLStyleElement[] = [];
+      // 세션 토큰 가져오기
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token || '';
+
+      const response = await fetch('/api/pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+        },
+        body: JSON.stringify(pdfPayload)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF from server');
+      }
+
+      const pdfBlob = await response.blob();
       
-      try {
-        // oklch를 포함한 style 태그만 비활성화 (Next.js layout CSS 링크 비활성화로 인한 404 차단)
-        document.querySelectorAll('style').forEach((el: any) => {
-          if (!el.disabled && el.innerHTML.includes('oklch')) {
-            el.disabled = true;
-            activeStyleTags.push(el);
-          }
-        });
-      } catch (err) {
-        console.warn('Style bypass error:', err);
-      }
-
-      const pdfBlob = await html2pdf().from(container).set(opt).outputPdf('blob');
-
-      // 비활성화했던 스타일시트 즉각 원상복구 (화면 깨짐 방지)
-      activeStyleTags.forEach(el => el.disabled = false);
-
-      const pdfFile = new File([pdfBlob], `Agreement_${loan.id}.pdf`, { type: 'application/pdf' });
-
-      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-        await navigator.share({
-          files: [pdfFile],
-          title: `MUtang Credit Contract (${loan.id.slice(0, 8)})`,
-          text: `Credit Agreement between ${loan.lender?.full_name || 'Lender'} and ${loan.borrower?.full_name || 'Borrower'}.`
-        });
-      } else {
+      if (isPreview) {
         const url = URL.createObjectURL(pdfBlob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Agreement_${loan.id}.pdf`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
+        setPdfPreviewUrl(url);
+        setIsPdfPreviewOpen(true);
+        toast.success(t('pdf_preview_ready') || 'PDF 미리보기가 준비되었습니다.');
+      } else {
+        const pdfFile = new File([pdfBlob], `Agreement_${loan.id}.pdf`, { type: 'application/pdf' });
 
-      toast.success(t('link_generated') || 'PDF 계약서 다운로드 및 공유 완료');
+        if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+          await navigator.share({
+            files: [pdfFile],
+            title: `MUtang Credit Contract (${loan.id.slice(0, 8)})`,
+            text: `Credit Agreement between ${loan.lender?.full_name || 'Lender'} and ${loan.borrower?.full_name || 'Borrower'}.`
+          });
+        } else {
+          const url = URL.createObjectURL(pdfBlob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Agreement_${loan.id}.pdf`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+
+        toast.success(t('link_generated') || 'PDF 계약서 다운로드 및 공유 완료');
+      }
     } catch (error) {
       console.error('PDF Generation Error:', error);
-      toast.error(t('link_failed') || 'PDF 다운로드에 실패했습니다.');
+      toast.error(t('link_failed') || 'PDF 처리에 실패했습니다.');
     } finally {
       setIsGeneratingPDF(null);
     }
@@ -588,7 +407,9 @@ export default function Transactions() {
     try {
       // 1. 이미지 압축 및 화질 검사
       const compressedBlob = await compressImage(file);
+      
       const qualityCheck = await checkImageQuality(compressedBlob);
+      
       if (!qualityCheck.success) {
         toast.error(qualityCheck.message, { duration: 6000 });
         setIsUploadingPhotos(false);
@@ -623,8 +444,10 @@ export default function Transactions() {
         .from(bucket)
         .upload(fileName, compressedBlob, { upsert: true, contentType: 'image/jpeg' });
 
-      if (uploadError) throw uploadError;
-
+      if (uploadError) {
+        console.error(`[processCapturedPhoto] Upload FAILED:`, uploadError);
+        throw uploadError;
+      }
       // 3. 업로드 완료 후 Public URL 획득
       const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(fileName);
 
@@ -635,12 +458,13 @@ export default function Transactions() {
 
       toast.success(t('upload_proof_success') || '업로드 및 임시 제출 완료!');
     } catch (err: any) {
-      console.error(err);
+      console.error(`[processCapturedPhoto] ERROR:`, err);
       toast.error(err.message || '업로드 실패. 다시 시도해 주세요.');
     } finally {
       setIsUploadingPhotos(false);
     }
   };
+
 
   const fetchMarketplace = async () => {
     setLoading(true);
@@ -785,7 +609,6 @@ export default function Transactions() {
   };
 
   const handleConfirmDeletePost = async () => {
-    console.log("handleConfirmDeletePost triggered with id:", postToDeleteId);
     if (!postToDeleteId) {
       toast.error(t('error_occurred') || "삭제할 공고 ID가 존재하지 않습니다.");
       return;
@@ -1132,6 +955,40 @@ export default function Transactions() {
       }
     }
   }, [user, activeTab, matchingType]);
+
+  useEffect(() => {
+    if (mounted && typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      const requestIdParam = params.get('requestId');
+      
+      if (tabParam === 'marketplace') {
+        setActiveTab('marketplace');
+      }
+      
+      if (requestIdParam) {
+        const fetchAndStart = async () => {
+          try {
+            const { data, error } = await supabase
+              .from('matching_requests')
+              .select(`
+                *,
+                poster_profile:profiles!matching_requests_borrower_id_fkey(full_name, trust_tier, trust_score, is_verified)
+              `)
+              .eq('id', requestIdParam)
+              .single();
+            if (error) throw error;
+            if (data) {
+              handleStartTransaction(data);
+            }
+          } catch (err) {
+            console.error('Error fetching request from URL param:', err);
+          }
+        };
+        fetchAndStart();
+      }
+    }
+  }, [mounted]);
 
   if (!mounted) return null;
 
@@ -1508,6 +1365,17 @@ export default function Transactions() {
             debts.map((loan: any) => {
               const isLender = loan.lender_id === user?.id;
               const totalRepayment = Number(loan.amount) * (1 + Number(loan.interest_rate || 0) / 100);
+              // verification_evidence 안전 파싱 (DB에서 string 또는 object로 올 수 있음)
+              let evidence = loan.verification_evidence;
+              if (typeof evidence === 'string') {
+                try { evidence = JSON.parse(evidence); } catch { evidence = null; }
+              }
+              // signature_data 안전 파싱
+              let sigData: { lender?: string; borrower?: string } = {};
+              try {
+                const raw = loan.signature_data;
+                sigData = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+              } catch { sigData = {}; }
               return (
                 <Card key={loan.id} className="p-6 border-slate-100 dark:border-white/5 bg-white dark:bg-slate-900/50 rounded-3xl border-b-4 border-b-slate-50 dark:border-b-white/5 animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-4">
                   <div className="flex items-center justify-between">
@@ -1577,20 +1445,29 @@ export default function Transactions() {
                       </div>
                     )}
                     
-                    <div className="mt-3.5 pt-2 border-t border-slate-100 dark:border-white/5 flex gap-2">
+                    <div className="mt-3.5 pt-2 border-t border-slate-100 dark:border-white/5 grid grid-cols-3 gap-2">
                       <Button
                         onClick={() => handleDownloadContractPDF(loan)}
                         disabled={isGeneratingPDF === loan.id}
                         variant="outline"
-                        className="flex-1 rounded-xl font-bold h-11 text-xs border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1.5 text-slate-700 dark:text-slate-200"
+                        className="rounded-xl font-bold h-11 text-[10px] sm:text-xs border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1 text-slate-700 dark:text-slate-200"
                       >
                         {isGeneratingPDF === loan.id ? t('preparing_pdf') : t('download_pdf')}
+                      </Button>
+
+                      <Button
+                        onClick={() => handleDownloadContractPDF(loan, true)}
+                        disabled={isGeneratingPDF === loan.id}
+                        variant="outline"
+                        className="rounded-xl font-bold h-11 text-[10px] sm:text-xs border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1 text-slate-700 dark:text-slate-200"
+                      >
+                        {isGeneratingPDF === loan.id ? t('preparing_pdf') : (t('preview_pdf') || '미리보기')}
                       </Button>
                       
                       <Button
                         onClick={() => toggleEvidence(loan.id)}
                         variant="outline"
-                        className="flex-1 rounded-xl font-bold h-11 text-xs border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1.5 text-slate-700 dark:text-slate-200"
+                        className="rounded-xl font-bold h-11 text-[10px] sm:text-xs border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1 text-slate-700 dark:text-slate-200"
                       >
                         {expandedEvidence[loan.id] ? (
                           <>
@@ -1621,7 +1498,7 @@ export default function Transactions() {
                             { key: 'back2', label: t('id_back_2') },
                             { key: 'selfie', label: t('selfie_label') }
                           ].map((photoItem) => {
-                            const photoUrl = loan.verification_evidence?.photos?.[photoItem.key];
+                            const photoUrl = evidence?.photos?.[photoItem.key];
                             return (
                               <div key={photoItem.key} className="space-y-1 text-center">
                                 <div className={`aspect-[4/3] ${photoItem.key === 'selfie' ? 'rounded-full max-w-[64px] max-h-[64px] mx-auto' : 'rounded-xl'} bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 overflow-hidden relative group`}>
@@ -1644,8 +1521,8 @@ export default function Transactions() {
                           <div className="text-center bg-white dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                             <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">LENDER SIGNATURE</span>
                             <div className="h-12 flex items-center justify-center">
-                              {JSON.parse(loan.signature_data || '{}').lender ? (
-                                <img src={JSON.parse(loan.signature_data).lender} alt="Lender Signature" className="max-h-10 object-contain" />
+                              {sigData.lender ? (
+                                <img src={sigData.lender} alt="Lender Signature" className="max-h-10 object-contain" />
                               ) : (
                                 <span className="text-[9px] text-slate-400 italic">{t('no_signature')}</span>
                               )}
@@ -1654,8 +1531,8 @@ export default function Transactions() {
                           <div className="text-center bg-white dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                             <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">BORROWER SIGNATURE</span>
                             <div className="h-12 flex items-center justify-center">
-                              {JSON.parse(loan.signature_data || '{}').borrower ? (
-                                <img src={JSON.parse(loan.signature_data).borrower} alt="Borrower Signature" className="max-h-10 object-contain" />
+                              {sigData.borrower ? (
+                                <img src={sigData.borrower} alt="Borrower Signature" className="max-h-10 object-contain" />
                               ) : (
                                 <span className="text-[9px] text-slate-400 italic">{t('no_signature')}</span>
                               )}
@@ -2858,6 +2735,58 @@ export default function Transactions() {
           t={t}
         />
       )}
+
+      {/* PDF 미리보기 모달 */}
+      <Dialog open={isPdfPreviewOpen} onOpenChange={(open) => {
+        setIsPdfPreviewOpen(open);
+        if (!open && pdfPreviewUrl) {
+          URL.revokeObjectURL(pdfPreviewUrl);
+          setPdfPreviewUrl(null);
+        }
+      }}>
+        <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-black dark:text-white">
+              {t('pdf_preview_title') || '계약서 PDF 미리보기'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 w-full bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden mt-2 relative">
+            {pdfPreviewUrl ? (
+              <iframe
+                src={pdfPreviewUrl}
+                className="w-full h-full border-none rounded-2xl"
+                title="PDF Preview"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 mt-4 shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsPdfPreviewOpen(false)}
+              className="rounded-xl font-bold h-11 text-xs border-slate-200 dark:border-white/10"
+            >
+              {t('close') || '닫기'}
+            </Button>
+            {pdfPreviewUrl && (
+              <Button
+                onClick={() => {
+                  const a = document.createElement('a');
+                  a.href = pdfPreviewUrl;
+                  a.download = `Agreement_Preview.pdf`;
+                  a.click();
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black h-11 text-xs"
+              >
+                {t('download') || '다운로드'}
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 // MUtang Service Worker - PWA Offline Caching and Push Notifications
 
-const CACHE_NAME = 'mutang-cache-v1';
+const CACHE_NAME = 'mutang-cache-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
@@ -44,6 +44,11 @@ self.addEventListener('fetch', function(event) {
 
   // API나 Supabase 데이터 조회, 웹훅 등은 캐시 대상에서 배제
   if (event.request.url.includes('/api/') || event.request.url.includes('/supabase/')) {
+    return;
+  }
+
+  // Next.js 동적 JS/CSS 청크는 캐시하지 않음 (언어/코드 최신성 보장)
+  if (event.request.url.includes('/_next/')) {
     return;
   }
 

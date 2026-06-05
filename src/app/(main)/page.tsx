@@ -9,18 +9,8 @@ import {
   Package, 
   TrendingUp, 
   Clock, 
-  ChevronRight,
-  HandCoins,
   Bell,
-  Coins,
-  Plus,
-  History,
-  X,
-  Copy,
-  QrCode,
-  Wallet,
-  ExternalLink,
-  Smartphone
+  Coins
 } from 'lucide-react';
 import Link from 'next/link';
 import { TierBadge } from '@/components/ui/tier-badge';
@@ -33,91 +23,6 @@ export default function Dashboard() {
   const { profile, loading: profileLoading, t, refreshProfile } = useAuth();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [isCreditModalOpen, setIsCreditModalOpen] = useState(false);
-  const [creditTab, setCreditTab] = useState<'recharge' | 'history'>('recharge');
-  
-  const [creditHistory, setCreditHistory] = useState<any[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [rechargeAmount, setRechargeAmount] = useState('');
-  const [rechargeMethod, setRechargeMethod] = useState<'gcash' | 'solana_usdt'>('gcash');
-  const [fromWallet, setFromWallet] = useState('');
-  const [activeRequest, setActiveRequest] = useState<any | null>(null);
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
-  const [adminProfile, setAdminProfile] = useState<any>(null);
-
-  const fetchAdminProfile = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('gcash_number, gcash_qr_url, solana_wallet')
-        .eq('is_admin', true)
-        .limit(1);
-      
-      if (data && data.length > 0) {
-        setAdminProfile(data[0]);
-      } else {
-        setAdminProfile({
-          gcash_number: '+639275884114',
-          gcash_qr_url: '/gcash-qr.jpg',
-          solana_wallet: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
-        });
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const fetchCreditHistory = async () => {
-    if (!profile?.id) return;
-    setHistoryLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('deposit_requests')
-        .select('*')
-        .eq('user_id', profile.id)
-        .order('created_at', { ascending: false });
-
-      if (data) {
-        setCreditHistory(data);
-        
-        const active = data.find(req => {
-          if (req.status !== 'pending') return false;
-          const expiresTime = new Date(req.expires_at).getTime();
-          return expiresTime > Date.now();
-        });
-        
-        if (active) {
-          setActiveRequest(active);
-          const diff = Math.max(0, Math.floor((new Date(active.expires_at).getTime() - Date.now()) / 1000));
-          setTimeLeft(diff);
-        } else {
-          setActiveRequest(null);
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (timeLeft <= 0) {
-      if (activeRequest) {
-        setActiveRequest(null);
-        fetchCreditHistory();
-      }
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setTimeLeft(prev => prev - 1);
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [timeLeft, activeRequest]);
-
   useEffect(() => {
     if (!profile?.id) return;
 
@@ -133,7 +38,6 @@ export default function Dashboard() {
         },
         (payload: any) => {
           if (payload.new && payload.new.status === 'completed') {
-            console.log('[실시간 알림 요원] 입금 승인이 감지되었습니다. 보유 크레딧을 즉시 최신화합니다.');
             refreshProfile();
             toast.success('보유 크레딧이 실시간 입금 처리로 자동 갱신되었습니다!');
           }
@@ -145,65 +49,6 @@ export default function Dashboard() {
       supabase.removeChannel(channel);
     };
   }, [profile?.id]);
-
-  const handleRecharge = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!profile?.id) return;
-    
-    const amountVal = parseFloat(rechargeAmount);
-    if (isNaN(amountVal) || amountVal <= 0) {
-      toast.error('올바른 금액을 입력해 주세요.');
-      return;
-    }
-
-    if (rechargeMethod === 'solana_usdt' && !fromWallet) {
-      toast.error('송금할 솔라나 지갑 주소를 입력해 주세요.');
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const randomCents = Math.floor(Math.random() * 99) + 1;
-      const uniqueAmountVal = amountVal + (randomCents / 100);
-      
-      const now = new Date();
-      const expiresAtVal = new Date(now.getTime() + 3 * 60 * 1000).toISOString(); // 3분
-
-      const { data, error } = await supabase
-        .from('deposit_requests')
-        .insert({
-          user_id: profile.id,
-          amount: amountVal,
-          unique_amount: uniqueAmountVal,
-          method: rechargeMethod,
-          from_wallet: rechargeMethod === 'solana_usdt' ? fromWallet : null,
-          status: 'pending',
-          expires_at: expiresAtVal
-        })
-        .select()
-        .single();
-
-      if (error) {
-        toast.error(error.message);
-      } else {
-        setActiveRequest(data);
-        setTimeLeft(180);
-        setRechargeAmount('');
-        setFromWallet('');
-        toast.success('충전 요청이 정상 등록되었습니다!');
-        fetchCreditHistory();
-      }
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleCopyText = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success('복사되었습니다.');
-  };
 
   useEffect(() => {
     setMounted(true);

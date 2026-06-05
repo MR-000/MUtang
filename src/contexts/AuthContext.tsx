@@ -111,6 +111,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [theme]);
 
+  useEffect(() => {
+    // lang 속성 동기화 - SSR lang="en"과 실제 사용자 언어 일치시킴
+    if (language) {
+      document.documentElement.lang = language;
+    }
+  }, [language]);
+
   const t = (key: string) => getTranslation(key, language);
 
   const signOut = async () => {

@@ -14,11 +14,13 @@ import {
   ChevronRight,
   Info
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { TierBadge } from '@/components/ui/tier-badge';
 import { toast } from 'sonner';
 
 export default function Marketplace() {
   const { user, profile, t } = useAuth();
+  const router = useRouter();
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -27,37 +29,58 @@ export default function Marketplace() {
   }, []);
 
   const fetchRequests = async () => {
-    // In a real app, we'd fetch from matching_requests table
-    // For now, we'll show mock data that matches the premium UI
-    const mockRequests = [
-      {
-        id: '1',
-        borrower_name: 'Maria Santos',
-        store_type: 'Sari-Sari Store',
-        amount: 5000,
-        purpose: 'Inventory Restock',
-        tier: 'Gold',
-        repayment_rate: '98%',
-        created_at: new Date().toISOString()
-      },
-      {
-        id: '2',
-        borrower_name: 'Jun-Jun Store',
-        store_type: 'Bakery',
-        amount: 12000,
-        purpose: 'New Equipment',
-        tier: 'Platinum',
-        repayment_rate: '100%',
-        created_at: new Date().toISOString()
-      }
-    ];
-    
-    setRequests(mockRequests);
-    setLoading(false);
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('matching_requests')
+        .select(`
+          *,
+          poster_profile:profiles!matching_requests_borrower_id_fkey(full_name, trust_tier, trust_score, is_verified)
+        `)
+        .eq('status', 'pending')
+        .is('lender_id', null)
+        .or(`due_date.gte.${todayStr},due_date.is.null`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      const mapped = (data || []).map((req: any) => {
+        let store_type = 'Sari-Sari Store';
+        let purpose = 'Business Funding';
+        
+        let cleanDesc = req.description || '';
+        const prefixMatch = cleanDesc.match(/^(\[[^\]]+\])\s*(.*)$/);
+        if (prefixMatch) {
+          cleanDesc = prefixMatch[2];
+        }
+        
+        purpose = cleanDesc || 'Business Funding';
+        
+        return {
+          id: req.id,
+          borrower_name: req.poster_profile?.full_name || 'Anonymous Borrower',
+          store_type: store_type,
+          amount: Number(req.amount),
+          purpose: purpose,
+          tier: req.poster_profile?.trust_tier || 'Bronze',
+          repayment_rate: req.poster_profile?.trust_score ? `${req.poster_profile.trust_score}%` : '100%',
+          created_at: req.created_at,
+          raw: req
+        };
+      });
+      
+      setRequests(mapped);
+    } catch (e) {
+      console.error('Failed to fetch active requests:', e);
+      toast.error(t('error_occurred') || 'Failed to fetch active requests');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleInvest = (req: any) => {
     toast.success(`${t('investment_request_sent')} ${req.borrower_name}`);
+    router.push(`/debts?tab=marketplace&requestId=${req.id}`);
   };
 
   return (
