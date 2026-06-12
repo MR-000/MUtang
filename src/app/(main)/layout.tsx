@@ -10,7 +10,9 @@ import {
   ShieldCheck,
   Settings,
   Info,
-  AlertTriangle
+  AlertTriangle,
+  Download,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,12 +44,66 @@ export default function MainLayout({
   const { user, loading, t, profile } = useAuth();
   const navItems = getNavItems(t, profile?.is_admin === true);
   const [isDebtsNoticeOpen, setIsDebtsNoticeOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isIOSAndSafari, setIsIOSAndSafari] = useState(false);
+  const [isSafariGuideOpen, setIsSafariGuideOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
       router.replace('/login');
     }
   }, [user, loading, router]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // 1. 이미 앱(standalone) 모드로 실행 중인 경우 배너를 노출하지 않음
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      return;
+    }
+
+    // 2. 사용자가 이번 세션에 배너를 닫은 이력이 있다면 노출하지 않음
+    const isDismissed = sessionStorage.getItem('pwa_install_dismissed') === 'true';
+    if (isDismissed) {
+      return;
+    }
+
+    // 3. iOS Safari 감지
+    const ua = window.navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
+    const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
+    if (isIOS && isSafari) {
+      setIsIOSAndSafari(true);
+      setShowInstallBanner(true);
+    }
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBanner(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`PWA install prompt outcome: ${outcome}`);
+    setDeferredPrompt(null);
+    setShowInstallBanner(false);
+  };
+
+  const handleDismissInstall = () => {
+    setShowInstallBanner(false);
+    sessionStorage.setItem('pwa_install_dismissed', 'true');
+  };
 
   if (loading || !user) {
     return (
@@ -66,6 +122,46 @@ export default function MainLayout({
     <div className="flex flex-col h-[100dvh] overflow-hidden bg-slate-50 dark:bg-[#0A0F1E]">
       {/* Premium Container with Mobile Constraint */}
       <main className="flex-1 w-full max-w-lg mx-auto relative bg-white dark:bg-[#0A0F1E] h-full flex flex-col overflow-hidden pb-24">
+        {/* PWA 인앱 설치 유도 배너 */}
+        {showInstallBanner && (deferredPrompt || isIOSAndSafari) && (
+          <div className="mx-6 mt-4 p-4 bg-gradient-to-r from-blue-600/90 to-indigo-600/90 text-white rounded-2xl shadow-xl flex items-center justify-between gap-3 animate-in slide-in-from-top-4 duration-300 z-50 border border-white/10 backdrop-blur-md">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                <Download className="w-5 h-5 text-white animate-bounce" />
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-xs font-black">{t('pwa_install_banner_title')}</p>
+                <p className="text-[10px] opacity-90 font-medium leading-tight">
+                  {isIOSAndSafari ? t('ios_pwa_guide') : t('pwa_install_banner_desc')}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button 
+                onClick={handleDismissInstall}
+                className="p-2 text-white/70 hover:text-white transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              {isIOSAndSafari ? (
+                <button 
+                  onClick={() => setIsSafariGuideOpen(true)}
+                  className="px-3 py-1.5 bg-white text-blue-600 font-black text-[10px] rounded-lg shadow-md hover:bg-slate-50 active:scale-95 transition-all"
+                >
+                  {t('confirm')}
+                </button>
+              ) : (
+                <button 
+                  onClick={handleInstallClick}
+                  className="px-3.5 py-2 bg-white text-blue-600 font-black text-[11px] rounded-xl shadow-md hover:bg-slate-50 active:scale-95 transition-all"
+                >
+                  {t('pwa_install_banner_btn')}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto px-6 pt-6 scrollbar-hide">
           {children}
         </div>
@@ -169,6 +265,42 @@ export default function MainLayout({
               className="flex-1 h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs shadow-lg shadow-blue-600/20 active:scale-95 transition-all flex items-center justify-center"
             >
               {t('debts_modal_agree_btn')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* iOS Safari PWA 설치 안내 모달 */}
+      <Dialog open={isSafariGuideOpen} onOpenChange={setIsSafariGuideOpen}>
+        <DialogContent className="max-w-md w-[90%] mx-auto bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-800 dark:border-white/10 rounded-3xl p-6 backdrop-blur-xl animate-in fade-in duration-300">
+          <DialogHeader className="space-y-3">
+            <div className="mx-auto w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+              <Download className="w-6 h-6 text-blue-500 animate-bounce" />
+            </div>
+            <DialogTitle className="text-center text-base font-black tracking-tight text-white leading-tight">
+              {t('pwa_install_banner_title')}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="py-2.5 space-y-4 text-slate-300 text-xs leading-relaxed">
+            <p className="font-medium text-center text-[13px] text-white">
+              {t('ios_pwa_guide')}
+            </p>
+            <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-3">
+              <p className="font-black text-slate-100 text-xs border-b border-white/10 pb-1.5">{t('pwa_guide_title')}</p>
+              <p>{t('pwa_guide_step1')}</p>
+              <p>{t('pwa_guide_step2')}</p>
+              <p>{t('pwa_guide_step3')}</p>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-slate-800/80">
+            <Button
+              type="button"
+              onClick={() => setIsSafariGuideOpen(false)}
+              className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs shadow-lg shadow-blue-600/20 active:scale-95 transition-all flex items-center justify-center"
+            >
+              {t('confirm')}
             </Button>
           </div>
         </DialogContent>

@@ -543,5 +543,54 @@ export const translations: Dictionary = {
     zh: '同意并继续',
     ja: '同意して続行'
   },
+  pwa_install_banner_title: {
+    en: 'Install MUtang App',
+    tl: 'I-install ang MUtang App',
+    ko: 'MUtang 앱 설치',
+    zh: '安装 MUtang 应用',
+    ja: 'MUtangアプリのインストール'
+  },
+  pwa_install_banner_desc: {
+    en: 'Add to Home Screen for faster loading and push notifications',
+    tl: 'Idagdag sa Home Screen para sa mas mabilis na pag-load at mga notification',
+    ko: '홈 화면에 추가하여 더 빠른 로딩과 알림 서비스를 이용해 보세요',
+    zh: '添加到主屏幕以获得更快的加载速度 and push notifications',
+    ja: 'ホーム画面に追加して、より高速な読み込みとプッシュ通知を利用してください'
+  },
+  pwa_install_banner_btn: {
+    en: 'Install',
+    tl: 'I-install',
+    ko: '설치',
+    zh: '安装',
+    ja: 'インストール'
+  },
+  pwa_guide_title: {
+    en: 'Installation Instructions',
+    tl: 'Mga Tagubilin sa Pag-install',
+    ko: '설치 순서 안내',
+    zh: '安装指南',
+    ja: 'インストール手順の案内'
+  },
+  pwa_guide_step1: {
+    en: '1. Tap the Share button at the bottom of the Safari browser.',
+    tl: '1. I-tap ang Share button sa ibaba ng Safari browser.',
+    ko: '1. Safari 브라우저 하단의 공유 버튼을 누릅니다.',
+    zh: '1. 点击 Safari 浏览器底部的分享按钮。',
+    ja: '1. Safariブラウザの下部にある共有ボタンをタップします。'
+  },
+  pwa_guide_step2: {
+    en: '2. Scroll down and select "Add to Home Screen".',
+    tl: '2. Mag-scroll pababa at piliin ang "Add to Home Screen".',
+    ko: '2. 메뉴를 아래로 스크롤하여 "홈 화면에 추가"를 선택합니다.',
+    zh: '2. 向下滚动并选择“添加到主屏幕”。',
+    ja: '2. 下にスクロールして「ホーム画面に追加」を選択します。'
+  },
+  pwa_guide_step3: {
+    en: '3. Tap "Add" in the top right corner to complete installation.',
+    tl: '3. I-tap ang "Add" sa kanang itaas na sulok upang makumpleto ang pag-install.',
+    ko: '3. 우측 상단의 "추가" 버튼을 누르면 설치가 완료됩니다.',
+    zh: '3. 点击右上角的“添加”按钮以完成安装。',
+    ja: '3. 右上の「追加」をタップすると, インストールが完了します。'
+  },
 };
 export const getTranslation = (key: string, lang: Language) => { return translations[key]?.[lang] || translations[key]?.['en'] || key; };
