@@ -473,5 +473,75 @@ export const translations: Dictionary = {
   fund_now: { en: 'Fund Now', tl: 'Pondohan Ngayon', ko: '자금 지원하기', zh: '立即资助', ja: '今すぐ資助' },
   no_active_requests: { en: 'No active matching requests available at the moment.', tl: 'Walang magagamit na aktibong matching request sa kasalukuyan.', ko: '현재 활성화된 대출 요청이 없습니다.', zh: '目前没有活跃的匹配请求。', ja: '現在アクティブなマッチングリクエストはありません。' },
   investment_request_sent: { en: 'Connecting to request by', tl: 'Kumokonekta sa request ni', ko: '다음 이용자의 거래로 연결 중:', zh: '正在连接请求自', ja: 'リクエストに接続中:' },
+  debts_modal_title: {
+    en: 'MUtang (Magbahagi Utang) Credit Transaction Agreement & Disclaimer',
+    tl: 'MUtang (Magbahagi Utang) Kasunduan sa Transaksyon sa Utang at Disclaimer',
+    ko: 'MUtang (Magbahagi Utang) 외상거래 동의 및 면책 고지',
+    zh: 'MUtang (Magbahagi Utang) 信贷交易协议与免责声明',
+    ja: 'MUtang (Magbahagi Utang) 外貨取引合意および免責事項'
+  },
+  debts_modal_sub1: {
+    en: '1. Credit Transaction Terms',
+    tl: '1. Mga Tuntunin sa Transaksyon sa Utang',
+    ko: '1. 외상거래 이용 약칙',
+    zh: '1. 信贷交易使用条款',
+    ja: '1. 外貨取引の利用規約'
+  },
+  debts_modal_desc1_1: {
+    en: 'This credit transaction is a legally binding agreement based on mutual trust.',
+    tl: 'Ang transaksyong ito ay may legal na bisa batay sa kasunduan ng magkabilang panig.',
+    ko: '본 외상거래는 상호 신뢰를 바탕으로 한 법적 효력을 지니는 약정입니다.',
+    zh: '本信贷交易是基于相互信任且具有法律效力的约定。',
+    ja: '本外貨取引は、相互の信頼に基づく法的効力を持つ約束です。'
+  },
+  debts_modal_desc1_2: {
+    en: 'All terms are transparently recorded in the ledger and cannot be forged.',
+    tl: 'Ang lahat ng kasunduan ay malinaw na nakatala sa ledger at hindi pwedeng palsipikahin.',
+    ko: '모든 약정 사항은 원장에 투명하게 기록되며 위변조가 불가능합니다.',
+    zh: '所有约定事项均透明记录于账本中，且无法伪造。',
+    ja: 'すべての合意事項は台帳に透明に記録され、改ざんできません。'
+  },
+  debts_modal_desc1_3: {
+    en: 'Compliance with the due date has a significant impact on your credit rating.',
+    tl: 'Ang pagsunod sa takdang petsa ay may malaking epekto sa iyong credit rating.',
+    ko: '상환 기일 준수는 귀하의 신용 등급에 큰 영향을 미칩니다.',
+    zh: '遵守还款期限将对您的信用评级产生重大影响。',
+    ja: '返済期日の遵守は、あなたの信用ランクに大きな影響を与えます。'
+  },
+  debts_modal_desc1_4: {
+    en: 'Please keep the remittance receipt safely after the transaction.',
+    tl: 'Pakiusap na itabi nang ligtas ang resibo ng padala pagkatapos ng transaksyon.',
+    ko: '송금 완료 후 송금증(영수증)은 안전하게 잘 보관해주시기 바랍니다.',
+    zh: '交易后请妥善保管汇款凭证（收据）。',
+    ja: '取引後の送金証明（領収書）は安全に保管してください。'
+  },
+  debts_modal_sub2: {
+    en: '2. Legal Disclaimer & Warning',
+    tl: '2. Legal Disclaimer at Babala',
+    ko: '2. 법적 면책 고지 및 경고',
+    zh: '2. 法律免责声明与警告',
+    ja: '2. 法的免責事項および警告'
+  },
+  debts_modal_desc2: {
+    en: 'The MUtang platform only guarantees the integrity of transaction records and is not legally liable for direct financial losses caused by non-payment or default between parties. In case of default, debt collection measures may be taken in accordance with local laws.',
+    tl: 'Ang MUtang platform ay ginagarantiyahan lamang ang integridad ng mga tala at walang legal na pananagutan sa mga direktang pagkalugi dahil sa hindi pagbabayad. Sa kaso ng default, maaaring gumawa ng mga hakbang sa pangongolekta ng utang alinsunod sa lokal na batas.',
+    ko: 'MUtang 플랫폼은 거래 정보 기록의 신뢰성을 보증할 뿐, 당사자 간의 미납 및 채무 불이행으로 인한 직접적 재정적 손실에는 법적 책임을 지지 않습니다. 채무 불이행 시 현지 법률에 의거하여 채권 회수 조치가 취해질 수 있습니다.',
+    zh: 'MUtang 平台仅保证交易记录的可靠性，不对双方因未付或违约引起的直接经济损失承担法律责任。若发生违约，可根据当地法律采取收回债权的措施。',
+    ja: 'MUtangプラットフォームは取引記録の信頼性を保証するのみであり、当事者間の未払いや債務不履行による直接的な財務損失について法的責任을負いません。債務不履行が発生した場合、現地法に基づき債権回収措置が取られることがあります。'
+  },
+  debts_modal_cancel_btn: {
+    en: 'Cancel',
+    tl: 'Cancel',
+    ko: '취소',
+    zh: '取消',
+    ja: 'キャンセル'
+  },
+  debts_modal_agree_btn: {
+    en: 'Agree & Continue',
+    tl: 'Sumang-ayon at Magpatuloy',
+    ko: '동의 및 계속',
+    zh: '同意并继续',
+    ja: '同意して続行'
+  },
 };
 export const getTranslation = (key: string, lang: Language) => { return translations[key]?.[lang] || translations[key]?.['en'] || key; };

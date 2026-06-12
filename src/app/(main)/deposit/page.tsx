@@ -255,8 +255,8 @@ export default function DepositPage() {
       ko: '2단계: 지정 금액 입금 대기 중'
     },
     step2DescGcash: {
-      en: 'Please send EXACTLY the unique amount to GCash number: 0917-123-4567. Accurate decimals are required for identity matchmaking.',
-      tl: 'Mangyaring ipadala ang TAMANG halaga sa GCash number: 0917-123-4567. Kailangan ang eksaktong decimal para sa matchmaking.',
+      en: 'Please send EXACTLY the unique amount to GCash number: 0927-588-4114. Accurate decimals are required for identity matchmaking.',
+      tl: 'Mangyaring ipadala ang TAMANG halaga sa GCash number: 0927-588-4114. Kailangan ang eksaktong decimal para sa matchmaking.',
       ko: '정확히 지정된 고유 금액을 아래 GCash 번호로 송금해주세요. 입금인 식별 매칭을 위해 소수점 자리가 정확해야 합니다.'
     },
     step2DescSolana: {
@@ -353,6 +353,31 @@ export default function DepositPage() {
       en: 'Close',
       tl: 'Isara',
       ko: '닫기'
+    },
+    guide_title: {
+      en: 'How does Auto-Recharge work?',
+      tl: 'Paano gumagana ang Auto-Recharge?',
+      ko: '실시간 크레딧 자동 충전 가이드 설명서'
+    },
+    guide_step1: {
+      en: '1. Enter Amount: A unique decimal (e.g. .37 PHP) is automatically attached to distinguish your transfer.',
+      tl: '1. Ilagay ang Halaga: May kasamang natatanging decimal (hal. .37 PHP) para makilala ang iyong transfer.',
+      ko: '1. 충전액 입력: 입금자 구분을 위해 고유 소수점(예: .37 PHP)이 자동으로 부여됩니다.'
+    },
+    guide_step2: {
+      en: '2. Exact Transfer: Send the EXACT amount (including decimal points) to our GCash receiver number.',
+      tl: '2. Eksaktong Transfer: Ipadala ang TAMA at EKSAKTONG halaga (kasama ang decimal) sa GCash number.',
+      ko: '2. 정확한 금액 송금: 고유 소수점을 포함한 정확한 액수를 GCash 번호로 송금해야 자동 매칭이 가능합니다.'
+    },
+    guide_step3: {
+      en: '3. Screenshot Upload: Upload the GCash receipt. Our AI automatically verifies it and deposits credits in 3 seconds.',
+      tl: '3. I-upload ang Resibo: I-upload ang GCash receipt screenshot. Awtomatikong i-verify ng AI at mag-deposit sa loob ng 3 segundo.',
+      ko: '3. 영수증 업로드: 송금 후 GCash 영수증 스크린샷을 올리면 AI가 즉시 판독하여 3초 내로 크레딧을 적립합니다.'
+    },
+    guide_step4: {
+      en: '4. Backup Manual Approval: If auto-recognition fails, the admin will verify the receipt and manually credit your account safely.',
+      tl: '4. Mano-manong Approval: Kung sakaling magka-error ang AI, mano-manong susuriin at papasok pa rin nang ligtas ang iyong credit.',
+      ko: '4. 안전한 수동 승인: 혹시 자동 인식이 지연/실패하더라도 관리자가 영수증을 확인하여 안전하게 즉시 충전해 드립니다.'
     }
   };
 
@@ -540,6 +565,7 @@ export default function DepositPage() {
       </header>
 
       {!activeRequest ? (
+        <div className="space-y-6">
         <form onSubmit={handleCreateCharge} className="space-y-6 bg-white p-5 border border-slate-100 rounded-3xl shadow-sm">
           {errorMsg && (
             <div className="p-3 bg-red-50 text-red-600 rounded-2xl flex items-center gap-2 text-xs font-semibold">
@@ -619,6 +645,20 @@ export default function DepositPage() {
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
+
+        <div className="p-5 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[28px] space-y-4 shadow-inner">
+          <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200 font-black text-xs uppercase tracking-wider">
+            <Info className="w-4 h-4 text-blue-500" />
+            <span>{getT('guide_title')}</span>
+          </div>
+          <div className="space-y-3 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400 font-medium">
+            <p className="p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 rounded-xl">{getT('guide_step1')}</p>
+            <p className="p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 rounded-xl">{getT('guide_step2')}</p>
+            <p className="p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 rounded-xl">{getT('guide_step3')}</p>
+            <p className="p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 rounded-xl">{getT('guide_step4')}</p>
+          </div>
+        </div>
+        </div>
       ) : (
         <div className="space-y-6">
           {/* 타이머 및 상태 안내 배너 */}
@@ -677,7 +717,7 @@ export default function DepositPage() {
                 <h4 className="text-xs font-bold text-slate-900">{getT('step2Title')}</h4>
                 <p className="text-[10px] text-slate-500 font-medium leading-normal mt-0.5">
                   {activeRequest.method === 'gcash' 
-                    ? `GCash: 0917-123-4567 • ₱${activeRequest.unique_amount.toFixed(2)} 송금 대기`
+                    ? `GCash: 0927-588-4114 • ₱${activeRequest.unique_amount.toFixed(2)} 송금 대기`
                     : `Solana: DtU5yJp3aK7wPqS9dMef... • $${activeRequest.unique_amount.toFixed(4)} 송금 대기`}
                 </p>
               </div>

@@ -107,7 +107,7 @@ const getSmartTranslatedText = (text: string | null | undefined, t: any): string
     let prefixContent = prefix.slice(1, -1);
     
     // 1. 만기/Due Date/Takdang Petsa 통합 치환
-    prefixContent = prefixContent.replace(/^(만기|Due Date|Takdang Petsa):/i, t("due_date") + ":");
+    prefixContent = prefixContent.replace(/^(만기일|만기|Due Date|Takdang Petsa):/i, t("due_date") + ":");
     
     // 2. "일 이내" 또는 "days within" 동적 치환 (예: 10일 이내)
     prefixContent = prefixContent.replace(/(\d+)\s*(일\s*이내|days?\s*within|araw\s*loob ng)/i, (_, num) => {
@@ -178,6 +178,8 @@ export default function Transactions() {
   const [feeRate, setFeeRate] = useState<number>(0.01);
   const [matchingType, setMatchingType] = useState<'borrower' | 'lender'>('borrower');
   const [searchQuery, setSearchQuery] = useState('');
+  const isUserLender = matchingType === 'borrower';
+  const isAdmin = user?.email?.includes('admin') || profile?.role === 'admin' || profile?.is_admin === true;
   
   const [debts, setDebts] = useState<Debt[]>([]);
   const [requests, setRequests] = useState<MatchingRequest[]>([]);
@@ -233,6 +235,13 @@ export default function Transactions() {
         return translations[key]?.['en'] || key;
       });
 
+      const transferredAt = evidence?.transferred_at 
+        ? format(new Date(evidence.transferred_at), 'yyyy-MM-dd HH:mm') 
+        : null;
+      const receivedAt = evidence?.received_at 
+        ? format(new Date(evidence.received_at), 'yyyy-MM-dd HH:mm') 
+        : null;
+
       const pdfPayload = {
         id: loan.id,
         lang: language || 'en',
@@ -254,13 +263,9 @@ export default function Transactions() {
         enDisclaimer: "I hereby acknowledge that I have received the goods/services listed above and agree to repay the specified amount on or before the due date.",
         lenderSig,
         borrowerSig,
-        photos: {
-          front1: evidence?.photos?.front1 || null,
-          back1: evidence?.photos?.back1 || null,
-          front2: evidence?.photos?.front2 || null,
-          back2: evidence?.photos?.back2 || null,
-          selfie: evidence?.photos?.selfie || null
-        },
+        photos: evidence?.photos || null,
+        transferredAt,
+        receivedAt,
         labels: {
           lender: t('lender') || '채권자',
           borrower: t('borrower') || '채무자',
@@ -390,6 +395,12 @@ export default function Transactions() {
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
   const [isIdWarningOpen, setIsIdWarningOpen] = useState(false);
   const [isCreditDeductOpen, setIsCreditDeductOpen] = useState(false);
+  const [isPartnerSignOpen, setIsPartnerSignOpen] = useState(false);
+  const [partnerSignLoan, setPartnerSignLoan] = useState<any>(null);
+  const [partnerStep, setPartnerStep] = useState(1);
+  const isSelfAdminTx = !!(isAdmin && selectedRequest && (selectedRequest.borrower_id === user?.id || selectedRequest.lender_id === user?.id));
+  const isSelfAdminPartnerTx = !!(isAdmin && partnerSignLoan && (partnerSignLoan.lender_id === user?.id || partnerSignLoan.borrower_id === user?.id));
+
 
   // Live Camera States
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -725,14 +736,14 @@ export default function Transactions() {
         if (periodValue === 'custom') {
           const customDays = parseInt(customPeriodDays || '30', 10);
           daysToAdd = isNaN(customDays) || customDays <= 0 ? 30 : customDays;
-          durationText = `${daysToAdd}${t('days') || '일'}`;
+          durationText = `${daysToAdd}일`;
         } else {
           const pVal = parseInt(periodValue, 10);
           daysToAdd = isNaN(pVal) ? 30 : pVal;
-          if (periodValue === '30') durationText = `1${t('month') || '개월'}`;
-          else if (periodValue === '60') durationText = `2${t('months') || '개월'}`;
-          else if (periodValue === '90') durationText = `3${t('months') || '개월'}`;
-          else durationText = `${daysToAdd}${t('days') || '일'}`;
+          if (periodValue === '30') durationText = `1개월`;
+          else if (periodValue === '60') durationText = `2개월`;
+          else if (periodValue === '90') durationText = `3개월`;
+          else durationText = `${daysToAdd}일`;
         }
 
         // 오늘 기준으로 일수 더하기
@@ -745,9 +756,9 @@ export default function Transactions() {
       let finalDescription = description || '';
       let badgePrefix = '';
       if (dueDateType === 'period') {
-        const dueText = t('due_date') || '만기';
-        const insideText = t('within') || '이내';
-        const adjustText = t('due_date_adjustable') || '기일 조정 가능';
+        const dueText = '만기';
+        const insideText = '이내';
+        const adjustText = '기일 조정 가능';
         badgePrefix = `[${dueText}: ${durationText} ${insideText}`;
         if (isAdjustable) {
           badgePrefix += ` / ${adjustText}`;
@@ -755,7 +766,7 @@ export default function Transactions() {
         badgePrefix += '] ';
       } else {
         if (isAdjustable) {
-          const adjustText = t('due_date_adjustable') || '기일 조정 가능';
+          const adjustText = '기일 조정 가능';
           badgePrefix = `[${adjustText}] `;
         }
       }
@@ -811,7 +822,7 @@ export default function Transactions() {
   };
 
   const handleCreateTransaction = async () => {
-    if (!amount || !lenderSignature || !borrowerSignature) {
+    if (!amount || (isUserLender ? !lenderSignature : !borrowerSignature)) {
       toast.error(t('complete_all_fields'));
       return;
     }
@@ -851,7 +862,6 @@ export default function Transactions() {
         .eq('id', selectedRequest?.id);
 
       // 3. Create actual loan record
-      const isUserLender = matchingType === 'borrower';
       const calcRepayAmount = parseFloat(amount) * (1 + parseFloat(interestRate || '0') / 100);
       const extendedDescription = `${description || t('matching_marketplace')} (이율: ${interestRate}%, 연체규정: ${overduePolicy})`;
       
@@ -864,16 +874,23 @@ export default function Transactions() {
           repay_amount: calcRepayAmount,
           description: extendedDescription,
           due_date: dueDate || null,
-          status: 'pending',
-          signature_data: JSON.stringify({ lender: lenderSignature, borrower: borrowerSignature }),
+          status: 'pending_signature',
+          signature_data: JSON.stringify({
+            lender: isUserLender ? lenderSignature : null,
+            borrower: !isUserLender ? borrowerSignature : null
+          }),
           verification_evidence: { 
             timestamp: new Date().toISOString(),
             method: 'Mobile Identity Capture',
             id_count: 2,
             photos_captured: Object.keys(uploadedUrls).length,
-            photos: uploadedUrls,
+            photos: {
+              lender: isUserLender ? uploadedUrls : null,
+              borrower: !isUserLender ? uploadedUrls : null
+            },
             interest_rate: parseFloat(interestRate || '0'),
-            overdue_policy: overduePolicy
+            overdue_policy: overduePolicy,
+            fee_payer_id: user?.id
           }
         }])
         .select()
@@ -881,13 +898,213 @@ export default function Transactions() {
 
       if (error) throw error;
       
-      toast.success(t('post_created'));
+      toast.success(t('post_created') + ' (상대방 서약 대기 상태)');
       setIsTransactionOpen(false);
       resetTransactionForm();
       setActiveTab('history');
       fetchLoans();
     } catch (error: any) {
       toast.error(error.message || t('error_occurred'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleOpenPartnerSignModal = (loan: any) => {
+    setPartnerSignLoan(loan);
+    setPartnerStep(1);
+    setIdPhotos({
+      front1: { file: null, preview: null, publicUrl: null },
+      back1: { file: null, preview: null, publicUrl: null },
+      front2: { file: null, preview: null, publicUrl: null },
+      back2: { file: null, preview: null, publicUrl: null },
+      selfie: { file: null, preview: null, publicUrl: null }
+    });
+    setLenderSignature(null);
+    setBorrowerSignature(null);
+    setIsPartnerSignOpen(true);
+  };
+
+  const handleCompletePartnerSign = async () => {
+    if (!partnerSignLoan || !user?.id) return;
+
+    const isLender = partnerSignLoan.lender_id === user.id;
+    
+    // 2. 기존 signature_data 안전 파싱
+    let existingSigs: { lender?: string | null; borrower?: string | null } = {};
+    try {
+      const rawSigs = partnerSignLoan.signature_data;
+      existingSigs = typeof rawSigs === 'string' ? JSON.parse(rawSigs || '{}') : (rawSigs || {});
+    } catch {
+      existingSigs = {};
+    }
+
+    const targetAsLender = isAdmin ? !existingSigs.lender : isLender;
+    const requiredSignature = targetAsLender ? lenderSignature : borrowerSignature;
+
+    if (!requiredSignature) {
+      toast.error(t('complete_all_fields'));
+      return;
+    }
+
+    // 중복 사진 체크
+    const front1Url = idPhotos.front1?.publicUrl || idPhotos.front1?.preview;
+    const front2Url = idPhotos.front2?.publicUrl || idPhotos.front2?.preview;
+    const back1Url = idPhotos.back1?.publicUrl || idPhotos.back1?.preview;
+    const back2Url = idPhotos.back2?.publicUrl || idPhotos.back2?.preview;
+
+    if (front1Url && front2Url && front1Url === front2Url) {
+      toast.error(t('security_warning_duplicate_front'), { duration: 6000 });
+      return;
+    }
+    if (back1Url && back2Url && back1Url === back2Url) {
+      toast.error(t('security_warning_duplicate_back'), { duration: 6000 });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setIsUploadingPhotos(true);
+
+    try {
+      // 1. 이미지 업로드 URL 수집
+      const uploadedUrls: Record<string, string> = {};
+      for (const [key, photo] of Object.entries(idPhotos)) {
+        if (photo.publicUrl) {
+          uploadedUrls[key] = photo.publicUrl;
+        }
+      }
+      setIsUploadingPhotos(false);
+
+      let existingEvidence: any = {};
+      try {
+        const rawEv = partnerSignLoan.verification_evidence;
+        existingEvidence = typeof rawEv === 'string' ? JSON.parse(rawEv || '{}') : (rawEv || {});
+      } catch {
+        existingEvidence = {};
+      }
+
+      // 새 사진 객체 초기화 보장
+      if (!existingEvidence.photos) {
+        existingEvidence.photos = { lender: null, borrower: null };
+      }
+
+      // 내 역할에 맞추어 서명 및 신원 정보 병합
+      if (targetAsLender) {
+        existingSigs.lender = lenderSignature;
+        existingEvidence.photos.lender = uploadedUrls;
+      } else {
+        existingSigs.borrower = borrowerSignature;
+        existingEvidence.photos.borrower = uploadedUrls;
+      }
+
+      // 최종 거래 성사를 위해 status를 waiting_transfer로 전환
+      const { error } = await supabase
+        .from('loans')
+        .update({
+          status: 'waiting_transfer',
+          signature_data: JSON.stringify(existingSigs),
+          verification_evidence: {
+            ...existingEvidence,
+            timestamp: new Date().toISOString(),
+            id_count: 4, // 양자 모두 제출 완료되었으므로 최종 ID 스캔 수는 4개
+            photos_captured: (existingEvidence.photos.lender ? Object.keys(existingEvidence.photos.lender).length : 0) + Object.keys(uploadedUrls).length
+          }
+        })
+        .eq('id', partnerSignLoan.id);
+
+      if (error) throw error;
+
+      toast.success('거래 서약 완료! 이제 채권자 송금 대기 상태로 전환되었습니다.');
+      setIsPartnerSignOpen(false);
+      setPartnerSignLoan(null);
+      fetchLoans();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || t('error_occurred'));
+    } finally {
+      setIsSubmitting(false);
+      setIsUploadingPhotos(false);
+    }
+  };
+
+  const handleConfirmTransfer = async (loan: any) => {
+    if (!loan || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      let evidence = loan.verification_evidence;
+      if (typeof evidence === 'string') {
+        try { evidence = JSON.parse(evidence); } catch { evidence = {}; }
+      } else {
+        evidence = evidence || {};
+      }
+      evidence.transferred_at = new Date().toISOString();
+
+      const { error } = await supabase
+        .from('loans')
+        .update({
+          status: 'waiting_receipt',
+          verification_evidence: evidence
+        })
+        .eq('id', loan.id);
+
+      if (error) throw error;
+      toast.success(t('transfer_completed_label') || '송금 완료 처리되었습니다.');
+      fetchLoans();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || t('error_occurred'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleConfirmReceipt = async (loan: any) => {
+    if (!loan || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      let evidence = loan.verification_evidence;
+      if (typeof evidence === 'string') {
+        try { evidence = JSON.parse(evidence); } catch { evidence = {}; }
+      } else {
+        evidence = evidence || {};
+      }
+      evidence.received_at = new Date().toISOString();
+
+      const feePayerId = evidence.fee_payer_id || loan.lender_id;
+      const transactionFee = parseFloat(loan.amount) * feeRate;
+
+      const { data: profileData, error: profileErr } = await supabase
+        .from('profiles')
+        .select('credit')
+        .eq('id', feePayerId)
+        .single();
+
+      if (profileErr) throw profileErr;
+
+      const currentCredit = profileData?.credit ? parseFloat(profileData.credit.toString()) : 0;
+      const newCredit = Math.max(0, currentCredit - transactionFee);
+
+      const { error: creditError } = await supabase
+        .from('profiles')
+        .update({ credit: newCredit })
+        .eq('id', feePayerId);
+
+      if (creditError) throw creditError;
+
+      const { error } = await supabase
+        .from('loans')
+        .update({
+          status: 'pending',
+          verification_evidence: evidence
+        })
+        .eq('id', loan.id);
+
+      if (error) throw error;
+      toast.success(t('receipt_completed_label') || '수령 및 계약 최종 성사 완료!');
+      fetchLoans();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || t('error_occurred'));
     } finally {
       setIsSubmitting(false);
     }
@@ -1305,6 +1522,14 @@ export default function Transactions() {
                         >
                           {t('delete') || '삭제'}
                         </Button>
+                        {isAdmin && (
+                          <Button 
+                            onClick={() => handleStartTransaction(req)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black px-3.5 h-9 text-xs shadow-md active:scale-95 shrink-0"
+                          >
+                            {t('transact')}
+                          </Button>
+                        )}
                       </div>
                     ) : (
                       <Button 
@@ -1445,75 +1670,197 @@ export default function Transactions() {
                       </div>
                     )}
                     
-                    <div className="mt-3.5 pt-2 border-t border-slate-100 dark:border-white/5 grid grid-cols-3 gap-2">
-                      <Button
-                        onClick={() => handleDownloadContractPDF(loan)}
-                        disabled={isGeneratingPDF === loan.id}
-                        variant="outline"
-                        className="rounded-xl font-bold h-11 text-[10px] sm:text-xs border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1 text-slate-700 dark:text-slate-200"
-                      >
-                        {isGeneratingPDF === loan.id ? t('preparing_pdf') : t('download_pdf')}
-                      </Button>
+                    {/* 서명 대기 상태 관련 로직 추가 */}
+                    {(() => {
+                    const isMySignaturePending = loan.status === 'pending_signature' && (
+                      isAdmin ||
+                      (loan.lender_id === user?.id && !sigData.lender) ||
+                      (loan.borrower_id === user?.id && !sigData.borrower)
+                    );
+                    const isPartnerSignaturePending = loan.status === 'pending_signature' && !isAdmin && !isMySignaturePending;
+                    const isWaitingTransfer = loan.status === 'waiting_transfer';
+                    const isWaitingReceipt = loan.status === 'waiting_receipt';
+                    const isPdfDisabled = ['pending_signature', 'waiting_transfer', 'waiting_receipt'].includes(loan.status);
 
-                      <Button
-                        onClick={() => handleDownloadContractPDF(loan, true)}
-                        disabled={isGeneratingPDF === loan.id}
-                        variant="outline"
-                        className="rounded-xl font-bold h-11 text-[10px] sm:text-xs border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1 text-slate-700 dark:text-slate-200"
-                      >
-                        {isGeneratingPDF === loan.id ? t('preparing_pdf') : (t('preview_pdf') || '미리보기')}
-                      </Button>
-                      
-                      <Button
-                        onClick={() => toggleEvidence(loan.id)}
-                        variant="outline"
-                        className="rounded-xl font-bold h-11 text-[10px] sm:text-xs border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1 text-slate-700 dark:text-slate-200"
-                      >
-                        {expandedEvidence[loan.id] ? (
-                          <>
-                            <EyeOff className="w-3.5 h-3.5" />
-                            <span>{t('close_proof')}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>{t('view_proof_photos')}</span>
-                          </>
+                    return (
+                      <div className="mt-3.5 pt-2 border-t border-slate-100 dark:border-white/5 flex flex-col gap-2">
+                        {/* 내가 서명해야 하는 대기 상태인 경우 */}
+                        {isMySignaturePending && (
+                          <Button
+                            onClick={() => handleOpenPartnerSignModal(loan)}
+                            className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Signature className="w-4 h-4" />
+                            <span>{t('sign_agreement_btn')}</span>
+                          </Button>
                         )}
-                      </Button>
-                    </div>
+
+                        {/* 상대방 서명을 기다리는 중인 경우 알림 배너 */}
+                        {isPartnerSignaturePending && (
+                          <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl text-[10px] font-bold text-center leading-normal">
+                            {t('partner_sig_pending')}
+                          </div>
+                        )}
+
+                        {/* 채권자 송금 대기 상태 */}
+                        {isWaitingTransfer && (
+                          isLender ? (
+                            <Button
+                              onClick={() => handleConfirmTransfer(loan)}
+                              disabled={isSubmitting}
+                              className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                            >
+                              <CreditCard className="w-4 h-4" />
+                              <span>{t('confirm_transfer_btn') || '송금 완료 확인'}</span>
+                            </Button>
+                          ) : (
+                            <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl text-[10px] font-bold text-center leading-normal animate-pulse">
+                              {t('waiting_lender_transfer') || '채권자의 송금을 기다리는 중입니다.'}
+                            </div>
+                          )
+                        )}
+
+                        {/* 채무자 수령 대기 상태 */}
+                        {isWaitingReceipt && (
+                          !isLender ? (
+                            <Button
+                              onClick={() => handleConfirmReceipt(loan)}
+                              disabled={isSubmitting}
+                              className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                              <span>{t('confirm_receipt_btn') || '수령 완료 확인'}</span>
+                            </Button>
+                          ) : (
+                            <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl text-[10px] font-bold text-center leading-normal animate-pulse">
+                              {t('waiting_borrower_receipt') || '채무자의 수령 확인을 기다리는 중입니다.'}
+                            </div>
+                          )
+                        )}
+
+                        {/* 하단 버튼 제어 */}
+                        <div className={`grid ${isPdfDisabled ? 'grid-cols-1' : 'grid-cols-3'} gap-2 w-full`}>
+                          {!isPdfDisabled && (
+                            <>
+                              <Button
+                                onClick={() => handleDownloadContractPDF(loan)}
+                                disabled={isGeneratingPDF === loan.id}
+                                variant="outline"
+                                className="rounded-xl font-bold h-11 text-[10px] sm:text-xs border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1 text-slate-700 dark:text-slate-200"
+                              >
+                                {isGeneratingPDF === loan.id ? t('preparing_pdf') : t('download_pdf')}
+                              </Button>
+
+                              <Button
+                                onClick={() => handleDownloadContractPDF(loan, true)}
+                                disabled={isGeneratingPDF === loan.id}
+                                variant="outline"
+                                className="rounded-xl font-bold h-11 text-[10px] sm:text-xs border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1 text-slate-700 dark:text-slate-200"
+                              >
+                                {isGeneratingPDF === loan.id ? t('preparing_pdf') : (t('preview_pdf') || '미리보기')}
+                              </Button>
+                            </>
+                          )}
+                          
+                          <Button
+                            onClick={() => toggleEvidence(loan.id)}
+                            variant="outline"
+                            className="rounded-xl font-bold h-11 text-[10px] sm:text-xs border-slate-200 dark:border-white/10 active:scale-95 transition-transform flex items-center justify-center gap-1 text-slate-700 dark:text-slate-200 w-full"
+                          >
+                            {expandedEvidence[loan.id] ? (
+                              <>
+                                <EyeOff className="w-3.5 h-3.5" />
+                                <span>{t('close_proof')}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>{t('view_proof_photos')}</span>
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                     {/* Expanded Identity Evidence Grid View */}
                     {expandedEvidence[loan.id] && (
-                      <div className="mt-4 p-5 rounded-[24px] border border-blue-500/10 bg-blue-500/5 dark:bg-blue-500/5 space-y-4 animate-in slide-in-from-top-2 duration-300">
-                        <span className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-widest block">
-                          {t('identity_evidence_title')}
-                        </span>
-                        
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                          {[
-                            { key: 'front1', label: t('id_front_1') },
-                            { key: 'back1', label: t('id_back_1') },
-                            { key: 'front2', label: t('id_front_2') },
-                            { key: 'back2', label: t('id_back_2') },
-                            { key: 'selfie', label: t('selfie_label') }
-                          ].map((photoItem) => {
-                            const photoUrl = evidence?.photos?.[photoItem.key];
-                            return (
-                              <div key={photoItem.key} className="space-y-1 text-center">
-                                <div className={`aspect-[4/3] ${photoItem.key === 'selfie' ? 'rounded-full max-w-[64px] max-h-[64px] mx-auto' : 'rounded-xl'} bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 overflow-hidden relative group`}>
-                                  {photoUrl ? (
-                                    <img src={photoUrl} alt={photoItem.label} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-600 bg-slate-200/50 dark:bg-slate-800/50 text-[10px] italic">
-                                      {t('not_submitted')}
+                      <div className="mt-4 p-5 rounded-[24px] border border-blue-500/10 bg-blue-500/5 dark:bg-blue-500/5 space-y-5 animate-in slide-in-from-top-2 duration-300">
+                        {/* 1. 채권자 신원 정보 영역 */}
+                        <div className="space-y-2.5">
+                          <span className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-widest block">
+                            {t('lender')} {t('identity_verification')}
+                          </span>
+                          {loan.status === 'pending_signature' && !isLender ? (
+                            <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-[10px] text-slate-400 font-bold italic text-center">
+                              {t('evidence_hidden_before_success')}
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                              {[
+                                { key: 'front1', label: t('id_front_1') },
+                                { key: 'back1', label: t('id_back_1') },
+                                { key: 'front2', label: t('id_front_2') },
+                                { key: 'back2', label: t('id_back_2') },
+                                { key: 'selfie', label: t('selfie_label') }
+                              ].map((photoItem) => {
+                                const photoUrl = evidence?.photos?.lender?.[photoItem.key] || (loan.status !== 'pending_signature' && evidence?.photos?.[photoItem.key]);
+                                return (
+                                  <div key={photoItem.key} className="space-y-1 text-center">
+                                    <div className={`aspect-[4/3] ${photoItem.key === 'selfie' ? 'rounded-full max-w-[64px] max-h-[64px] mx-auto' : 'rounded-xl'} bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 overflow-hidden relative group`}>
+                                      {photoUrl ? (
+                                        <img src={photoUrl} alt={photoItem.label} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-600 bg-slate-200/50 dark:bg-slate-800/50 text-[10px] italic">
+                                          {t('not_submitted')}
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
-                                </div>
-                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wide block">{photoItem.label}</span>
-                              </div>
-                            );
-                          })}
+                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wide block">{photoItem.label}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 2. 채무자 신원 정보 영역 */}
+                        <div className="space-y-2.5 border-t border-blue-500/10 pt-3">
+                          <span className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-widest block">
+                            {t('borrower')} {t('identity_verification')}
+                          </span>
+                          {loan.status === 'pending_signature' && isLender ? (
+                            <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-[10px] text-slate-400 font-bold italic text-center">
+                              {t('evidence_hidden_before_success')}
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                              {[
+                                { key: 'front1', label: t('id_front_1') },
+                                { key: 'back1', label: t('id_back_1') },
+                                { key: 'front2', label: t('id_front_2') },
+                                { key: 'back2', label: t('id_back_2') },
+                                { key: 'selfie', label: t('selfie_label') }
+                              ].map((photoItem) => {
+                                const photoUrl = evidence?.photos?.borrower?.[photoItem.key] || (loan.status !== 'pending_signature' && evidence?.photos?.[photoItem.key]);
+                                return (
+                                  <div key={photoItem.key} className="space-y-1 text-center">
+                                    <div className={`aspect-[4/3] ${photoItem.key === 'selfie' ? 'rounded-full max-w-[64px] max-h-[64px] mx-auto' : 'rounded-xl'} bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 overflow-hidden relative group`}>
+                                      {photoUrl ? (
+                                        <img src={photoUrl} alt={photoItem.label} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-slate-600 bg-slate-200/50 dark:bg-slate-800/50 text-[10px] italic">
+                                          {t('not_submitted')}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wide block">{photoItem.label}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
 
                         {/* Signatures Row */}
@@ -1521,7 +1868,9 @@ export default function Transactions() {
                           <div className="text-center bg-white dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                             <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">LENDER SIGNATURE</span>
                             <div className="h-12 flex items-center justify-center">
-                              {sigData.lender ? (
+                              {loan.status === 'pending_signature' && !isLender ? (
+                                <span className="text-[9px] text-slate-400 italic">비공개</span>
+                              ) : sigData.lender ? (
                                 <img src={sigData.lender} alt="Lender Signature" className="max-h-10 object-contain" />
                               ) : (
                                 <span className="text-[9px] text-slate-400 italic">{t('no_signature')}</span>
@@ -1531,7 +1880,9 @@ export default function Transactions() {
                           <div className="text-center bg-white dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                             <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">BORROWER SIGNATURE</span>
                             <div className="h-12 flex items-center justify-center">
-                              {sigData.borrower ? (
+                              {loan.status === 'pending_signature' && isLender ? (
+                                <span className="text-[9px] text-slate-400 italic">비공개</span>
+                              ) : sigData.borrower ? (
                                 <img src={sigData.borrower} alt="Borrower Signature" className="max-h-10 object-contain" />
                               ) : (
                                 <span className="text-[9px] text-slate-400 italic">{t('no_signature')}</span>
@@ -1747,6 +2098,8 @@ export default function Transactions() {
                       type="number"
                       value={interestRate}
                       onChange={(e) => setInterestRate(e.target.value)}
+                      onFocus={(e) => { if (interestRate === '0') setInterestRate(''); }}
+                      onBlur={(e) => { if (e.target.value === '') setInterestRate('0'); }}
                       placeholder="0"
                       className="h-16 rounded-2xl text-xl font-black bg-slate-50 dark:bg-white/5 border-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -1936,18 +2289,35 @@ export default function Transactions() {
 
             {txStep === 3 && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="space-y-4">
-                  <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2 px-1">
-                    <Signature className="w-4 h-4 text-blue-500" /> {t('lender_signature')}
-                  </Label>
-                  <SignaturePad onSave={setLenderSignature} onClear={() => setLenderSignature(null)} />
-                </div>
-                <div className="space-y-4">
-                  <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2 px-1">
-                    <Signature className="w-4 h-4 text-blue-500" /> {t('borrower_signature')}
-                  </Label>
-                  <SignaturePad onSave={setBorrowerSignature} onClear={() => setBorrowerSignature(null)} />
-                </div>
+                {isUserLender ? (
+                  <>
+                    <div className="space-y-4">
+                      <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2 px-1">
+                        <Signature className="w-4 h-4 text-blue-500" /> {t('lender_signature')}
+                      </Label>
+                      <SignaturePad onSave={setLenderSignature} onClear={() => setLenderSignature(null)} />
+                    </div>
+                    <div className="space-y-4 p-5 rounded-[24px] border border-dashed border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 flex flex-col items-center justify-center text-center">
+                      <Clock className="w-8 h-8 text-slate-400 animate-pulse" />
+                      <span className="text-xs font-bold text-slate-500 mt-2">{t('partner_sig_pending')}</span>
+                      <span className="text-[10px] text-slate-400 mt-1">Lender(나)의 서약 작성 후 대기 상태로 등록됩니다.</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-4 p-5 rounded-[24px] border border-dashed border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 flex flex-col items-center justify-center text-center">
+                      <Clock className="w-8 h-8 text-slate-400 animate-pulse" />
+                      <span className="text-xs font-bold text-slate-500 mt-2">{t('partner_sig_pending')}</span>
+                      <span className="text-[10px] text-slate-400 mt-1">Borrower(나)의 서약 작성 후 대기 상태로 등록됩니다.</span>
+                    </div>
+                    <div className="space-y-4">
+                      <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2 px-1">
+                        <Signature className="w-4 h-4 text-blue-500" /> {t('borrower_signature')}
+                      </Label>
+                      <SignaturePad onSave={setBorrowerSignature} onClear={() => setBorrowerSignature(null)} />
+                    </div>
+                  </>
+                )}
                 <div className="p-5 bg-slate-50 dark:bg-white/5 rounded-[32px] border border-slate-100 dark:border-white/5">
                   <p className="text-[10px] font-medium text-slate-500 leading-relaxed italic">
                     {t('legal_disclaimer')}
@@ -1975,7 +2345,7 @@ export default function Transactions() {
               return (
                 <Button 
                   onClick={() => {
-                    if (txStep === 2) {
+                    if (txStep === 2 && !isSelfAdminTx) {
                       const front1Captured = !!idPhotos.front1.preview;
                       const back1Captured = !!idPhotos.back1.preview;
                       const front2Captured = !!idPhotos.front2.preview;
@@ -1993,7 +2363,7 @@ export default function Transactions() {
                     }
                     txStep < 3 ? setTxStep(prev => prev + 1) : handleCreateTransaction();
                   }}
-                  disabled={(txStep === 1 && (!amount || isCreditInsufficient)) || txStep === 3 && (!lenderSignature || !borrowerSignature) || isSubmitting || isUploadingPhotos}
+                  disabled={(txStep === 1 && (!amount || isCreditInsufficient)) || (txStep === 3 && (isUserLender ? !lenderSignature : !borrowerSignature)) || isSubmitting || isUploadingPhotos}
                   className="flex-1 h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-[24px] font-black text-xl shadow-2xl shadow-blue-500/40 active:scale-95 transition-all"
                 >
                   {txStep === 3 ? (isSubmitting || isUploadingPhotos ? t('saving') : t('confirm_and_save')) : t('next')}
@@ -2184,6 +2554,8 @@ export default function Transactions() {
                       setInterestRate(e.target.value);
                     }
                   }}
+                  onFocus={(e) => { if (interestRate === '0') setInterestRate(''); }}
+                  onBlur={(e) => { if (e.target.value === '') setInterestRate('0'); }}
                   placeholder="0"
                   className="h-16 rounded-2xl text-xl font-black bg-slate-50 dark:bg-white/5 border-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -2720,17 +3092,204 @@ export default function Transactions() {
         </DialogContent>
       </Dialog>
 
+      {/* Partner Signature Modal */}
+      <Dialog open={isPartnerSignOpen} onOpenChange={setIsPartnerSignOpen}>
+        <DialogContent 
+          style={isCameraOpen ? { display: 'none' } : undefined}
+          className="max-w-md w-[95%] h-[85vh] md:h-[75vh] rounded-[32px] dark:bg-slate-950 dark:border-white/5 px-6 pt-8 flex flex-col outline-none overflow-hidden"
+        >
+          <DialogHeader className="pb-4 shrink-0">
+            <div className="flex justify-center mb-4">
+              <div className="flex gap-1.5">
+                {[1, 2].map(s => (
+                  <div key={s} className={`h-1.5 rounded-full transition-all duration-500 ${partnerStep >= s ? 'w-8 bg-blue-600' : 'w-4 bg-slate-200 dark:bg-white/10'}`} />
+                ))}
+              </div>
+            </div>
+            <DialogTitle className="text-2xl font-black dark:text-white text-center">
+              {partnerStep === 1 ? t('identity_verification') : t('agreement_record')}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto py-6 space-y-8 scrollbar-hide">
+            {partnerStep === 1 && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { id: 'front1', label: t('id_front_1') },
+                    { id: 'back1', label: t('id_back_1') },
+                    { id: 'front2', label: t('id_front_2') },
+                    { id: 'back2', label: t('id_back_2') }
+                  ].map((p) => (
+                    <div key={p.id} className="space-y-2 text-center">
+                      <div 
+                        onClick={() => {
+                          setActivePhotoId(p.id);
+                          setCameraMode('id');
+                          setIsPartnerSignOpen(false);
+                          setIsCameraOpen(true);
+                        }}
+                        className="aspect-[4/3] bg-slate-50 dark:bg-white/5 rounded-[32px] border-2 border-dashed border-slate-200 dark:border-white/10 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 transition-all relative overflow-hidden group"
+                      >
+                        {idPhotos[p.id].preview ? (
+                          <img src={idPhotos[p.id].preview!} alt={p.label} className="w-full h-full object-cover" />
+                        ) : (
+                          <>
+                            <div className="w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <Camera className="w-6 h-6 text-blue-600" />
+                            </div>
+                            <span className="text-[9px] font-black text-slate-400 px-4 uppercase tracking-wider">{p.label}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-2 text-center">
+                  <div 
+                    onClick={() => {
+                      setActivePhotoId('selfie');
+                      setCameraMode('selfie');
+                      setIsPartnerSignOpen(false);
+                      setIsCameraOpen(true);
+                    }}
+                    className="w-full h-28 bg-slate-50 dark:bg-white/5 rounded-[32px] border-2 border-dashed border-slate-200 dark:border-white/10 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 transition-all relative overflow-hidden group"
+                  >
+                    {idPhotos.selfie?.preview ? (
+                      <div className="flex items-center gap-4 w-full h-full px-6">
+                        <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-blue-500">
+                          <img src={idPhotos.selfie.preview} alt="Selfie" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-xs font-black text-blue-600 uppercase tracking-wide">Selfie Captured</p>
+                          <p className="text-[10px] text-slate-400 font-bold mt-1">{t('selfie_verified_label')}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Camera className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t('selfie_capture_required')}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-start gap-4 p-5 bg-blue-600/10 dark:bg-blue-600/20 border border-blue-600/20 rounded-[32px] text-blue-600 dark:text-blue-400 animate-pulse">
+                  <ShieldCheck className="w-6 h-6 flex-shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-black leading-tight uppercase tracking-wide">{t('identity_verification')}</p>
+                    <p className="text-xs font-bold opacity-80">{t('agreement_confirmed')}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {partnerStep === 2 && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {(() => {
+                  let existingSigs: { lender?: string; borrower?: string } = {};
+                  try {
+                    const raw = partnerSignLoan?.signature_data;
+                    existingSigs = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+                  } catch {
+                    existingSigs = {};
+                  }
+                  const showLenderSign = isAdmin ? !existingSigs.lender : (partnerSignLoan?.lender_id === user?.id);
+                  return showLenderSign ? (
+                    <div className="space-y-4">
+                      <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2 px-1">
+                        <Signature className="w-4 h-4 text-blue-500" /> {t('lender_signature')}
+                      </Label>
+                      <SignaturePad onSave={setLenderSignature} onClear={() => setLenderSignature(null)} />
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2 px-1">
+                        <Signature className="w-4 h-4 text-blue-500" /> {t('borrower_signature')}
+                      </Label>
+                      <SignaturePad onSave={setBorrowerSignature} onClear={() => setBorrowerSignature(null)} />
+                    </div>
+                  );
+                })()}
+                <div className="p-5 bg-slate-50 dark:bg-white/5 rounded-[32px] border border-slate-100 dark:border-white/5">
+                  <p className="text-[10px] font-medium text-slate-500 leading-relaxed italic">
+                    {t('legal_disclaimer')}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-4 pb-8 flex gap-4 shrink-0">
+            {partnerStep > 1 && (
+              <Button 
+                variant="outline" 
+                onClick={() => setPartnerStep(prev => prev - 1)}
+                className="h-16 w-16 rounded-[24px] border-slate-200 dark:border-white/10 font-bold p-0 active:scale-95 transition-transform"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </Button>
+            )}
+            <Button
+              onClick={() => {
+                if (partnerStep === 1) {
+                  if (!isSelfAdminPartnerTx) {
+                    const missingPhotos = Object.entries(idPhotos).filter(([key, photo]) => !photo.preview);
+                    if (missingPhotos.length > 0) {
+                      toast.error(t('complete_all_fields'));
+                      return;
+                    }
+                  }
+                  setPartnerStep(2);
+                } else {
+                  handleCompletePartnerSign();
+                }
+              }}
+              disabled={isSubmitting}
+              className="flex-1 h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-[24px] font-black text-sm shadow-xl shadow-blue-500/25 active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {t('submitting')}
+                </>
+              ) : partnerStep === 1 ? (
+                <>
+                  <span>{t('next')}</span>
+                  <ChevronRight className="w-4 h-4" />
+                </>
+              ) : (
+                <>
+                  <span>{t('sign_agreement_btn')}</span>
+                  <CheckCircle2 className="w-4 h-4" />
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {isCameraOpen && activePhotoId && (
         <MLIDCamera 
           mode={cameraMode}
           onCapture={(file, preview) => {
             setIsCameraOpen(false);
-            setIsTransactionOpen(true);
+            if (partnerSignLoan) {
+              setIsPartnerSignOpen(true);
+            } else {
+              setIsTransactionOpen(true);
+            }
             processCapturedPhoto(activePhotoId, file, preview);
           }}
           onClose={() => {
             setIsCameraOpen(false);
-            setIsTransactionOpen(true);
+            if (partnerSignLoan) {
+              setIsPartnerSignOpen(true);
+            } else {
+              setIsTransactionOpen(true);
+            }
           }}
           t={t}
         />

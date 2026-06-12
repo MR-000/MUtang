@@ -151,14 +151,26 @@ export async function POST(req: NextRequest) {
       lenderSig,
       borrowerSig,
       photos,
+      transferredAt,
+      receivedAt,
       labels
     } = body;
 
-    // photos가 모두 null이면 Supabase DB에서 직접 조회하여 폴백
-    const hasPhotos = photos && (photos.front1 || photos.back1 || photos.front2 || photos.back2 || photos.selfie);
+    console.log('[PDF API] Received payload:', {
+      id,
+      lang,
+      lenderName,
+      borrowerName,
+      hasPhotosPayload: !!photos,
+      photosKeys: photos ? Object.keys(photos) : []
+    });
+
+    // photos가 모두 null이거나 id가 있으면 Supabase DB에서 직접 조회하여 폴백 및 상태 검증
     let dbLenderSig = lenderSig;
     let dbBorrowerSig = borrowerSig;
-    if (!hasPhotos && id) {
+    let isPendingSignature = false;
+
+    if (id) {
       try {
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
         const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -167,16 +179,35 @@ export async function POST(req: NextRequest) {
         });
         const { data: loanData, error: loanError } = await supabase
           .from('loans')
-          .select('verification_evidence, signature_data')
+          .select('status, verification_evidence, signature_data')
           .eq('id', id)
           .single();
+
+        if (loanError) {
+          console.error('[PDF API] DB Load Error:', loanError);
+        }
         if (!loanError && loanData) {
+          console.log('[PDF API] DB Load Success. status:', loanData.status);
+          if (['pending_signature', 'waiting_transfer', 'waiting_receipt'].includes(loanData.status)) {
+            isPendingSignature = true;
+          }
           let evidence = loanData.verification_evidence;
           if (typeof evidence === 'string') {
             try { evidence = JSON.parse(evidence); } catch { evidence = null; }
           }
-          if (evidence?.photos) {
-            photos = evidence.photos;
+          if (evidence) {
+            if (evidence.photos) {
+              photos = evidence.photos;
+            }
+            if (evidence.transferred_at && !transferredAt) {
+              const formattedDate = new Date(evidence.transferred_at);
+              // Simple format helper equivalent to yyyy-MM-dd HH:mm
+              transferredAt = formattedDate.toISOString().replace('T', ' ').substring(0, 16);
+            }
+            if (evidence.received_at && !receivedAt) {
+              const formattedDate = new Date(evidence.received_at);
+              receivedAt = formattedDate.toISOString().replace('T', ' ').substring(0, 16);
+            }
           }
           // 서명도 DB에서 폴백
           if (!lenderSig || !borrowerSig) {
@@ -192,6 +223,14 @@ export async function POST(req: NextRequest) {
         console.error('[PDF API] DB fallback error:', dbErr);
       }
     }
+
+    if (isPendingSignature) {
+      return NextResponse.json(
+        { error: 'PDF is not available before the transaction is fully signed and verified.' },
+        { status: 403 }
+      );
+    }
+
     // DB 폴백 서명 적용
     if (dbLenderSig && !lenderSig) lenderSig = dbLenderSig;
     if (dbBorrowerSig && !borrowerSig) borrowerSig = dbBorrowerSig;
@@ -210,7 +249,10 @@ export async function POST(req: NextRequest) {
       borrowerSignature: '채무자 서명',
       noSignature: '서명 미등록',
       description: '거래 내용',
-      overdue: '연체 규정'
+      overdue: '연체 규정',
+      transferStatus: '송수신 상태',
+      transferCompleted: '송금 완료',
+      receiptCompleted: '수령 완료'
     };
     const activeLabels = { ...defaultLabels, ...labels };
 
@@ -246,40 +288,44 @@ export async function POST(req: NextRequest) {
       page1.drawLine({ start: { x: 40, y: 690 }, end: { x: 572, y: 690 }, thickness: 1.5, color: borderGray });
 
       // 당사자 인적 정보 박스 배경
-      page1.drawRectangle({ x: 40, y: 580, width: 532, height: 95, color: lightBackground, borderColor: borderGray, borderWidth: 1 });
+      page1.drawRectangle({ x: 40, y: 560, width: 532, height: 115, color: lightBackground, borderColor: borderGray, borderWidth: 1 });
       
       // 당사자 정보 텍스트
       page1.drawText(`${activeLabels.lender}:`, { x: 55, y: 650, size: 10, font, color: grayColor });
       page1.drawText(`${lenderName || '-'} (${lenderPhone || '-'})`, { x: 170, y: 650, size: 10, font, color: textColor });
       
-      page1.drawText(`${activeLabels.borrower}:`, { x: 55, y: 625, size: 10, font, color: grayColor });
-      page1.drawText(`${borrowerName || '-'}`, { x: 170, y: 625, size: 10, font, color: textColor });
+      page1.drawText(`${activeLabels.borrower}:`, { x: 55, y: 630, size: 10, font, color: grayColor });
+      page1.drawText(`${borrowerName || '-'}`, { x: 170, y: 630, size: 10, font, color: textColor });
       
-      page1.drawText(`${activeLabels.date}:`, { x: 55, y: 600, size: 10, font, color: grayColor });
-      page1.drawText(`${transactionDate || '-'}`, { x: 170, y: 600, size: 10, font, color: textColor });
+      page1.drawText(`${activeLabels.date}:`, { x: 55, y: 610, size: 10, font, color: grayColor });
+      page1.drawText(`${transactionDate || '-'}`, { x: 170, y: 610, size: 10, font, color: textColor });
+
+      // 송금 및 수령 완료 정보
+      const transferStatusText = `${activeLabels.transferStatus}: ${activeLabels.transferCompleted} (${transferredAt || '-'}) / ${activeLabels.receiptCompleted} (${receivedAt || '-'})`;
+      page1.drawText(transferStatusText, { x: 55, y: 590, size: 9, font, color: primaryColor });
 
       // 거래 조건 표 (Table)
-      page1.drawText(activeLabels.termsTitle, { x: 40, y: 550, size: 12, font, color: textColor });
+      page1.drawText(activeLabels.termsTitle, { x: 40, y: 530, size: 12, font, color: textColor });
       
       // 표 헤더 배경
-      page1.drawRectangle({ x: 40, y: 505, width: 532, height: 30, color: lightBackground, borderColor: borderGray, borderWidth: 1 });
-      page1.drawText(activeLabels.principal, { x: 55, y: 517, size: 9, font, color: grayColor });
-      page1.drawText(activeLabels.interest, { x: 180, y: 517, size: 9, font, color: grayColor });
-      page1.drawText(activeLabels.repayment, { x: 300, y: 517, size: 9, font, color: grayColor });
-      page1.drawText(activeLabels.due, { x: 450, y: 517, size: 9, font, color: grayColor });
+      page1.drawRectangle({ x: 40, y: 485, width: 532, height: 30, color: lightBackground, borderColor: borderGray, borderWidth: 1 });
+      page1.drawText(activeLabels.principal, { x: 55, y: 497, size: 9, font, color: grayColor });
+      page1.drawText(activeLabels.interest, { x: 180, y: 497, size: 9, font, color: grayColor });
+      page1.drawText(activeLabels.repayment, { x: 300, y: 497, size: 9, font, color: grayColor });
+      page1.drawText(activeLabels.due, { x: 450, y: 497, size: 9, font, color: grayColor });
 
       // 표 데이터
-      page1.drawRectangle({ x: 40, y: 465, width: 532, height: 40, borderColor: borderGray, borderWidth: 1 });
-      page1.drawText(amount || '-', { x: 55, y: 480, size: 11, font, color: textColor });
-      page1.drawText(interestRate || '-', { x: 180, y: 480, size: 11, font, color: primaryColor });
-      page1.drawText(repayAmount || '-', { x: 300, y: 480, size: 11, font, color: textColor });
-      page1.drawText(dueDate || '-', { x: 450, y: 480, size: 11, font, color: redColor });
+      page1.drawRectangle({ x: 40, y: 445, width: 532, height: 40, borderColor: borderGray, borderWidth: 1 });
+      page1.drawText(amount || '-', { x: 55, y: 460, size: 11, font, color: textColor });
+      page1.drawText(interestRate || '-', { x: 180, y: 460, size: 11, font, color: primaryColor });
+      page1.drawText(repayAmount || '-', { x: 300, y: 460, size: 11, font, color: textColor });
+      page1.drawText(dueDate || '-', { x: 450, y: 460, size: 11, font, color: redColor });
 
       // 상세 내용 및 연체 규정 박스
-      page1.drawRectangle({ x: 40, y: 360, width: 532, height: 90, color: lightBackground, borderColor: borderGray, borderWidth: 1 });
+      page1.drawRectangle({ x: 40, y: 340, width: 532, height: 90, color: lightBackground, borderColor: borderGray, borderWidth: 1 });
       
       const wrappedLocalDesc = wrapText(`${activeLabels.description}: ${localDescription || '-'}`, font, 10, 500);
-      let descY = 430;
+      let descY = 410;
       wrappedLocalDesc.slice(0, 2).forEach(line => {
         page1.drawText(line, { x: 55, y: descY, size: 10, font, color: textColor });
         descY -= 16;
@@ -293,9 +339,9 @@ export async function POST(req: NextRequest) {
       });
 
       // 법적 서약 및 고지 사항
-      page1.drawRectangle({ x: 40, y: 220, width: 532, height: 120, color: lightBackground, borderColor: borderGray, borderWidth: 1 });
+      page1.drawRectangle({ x: 40, y: 210, width: 532, height: 115, color: lightBackground, borderColor: borderGray, borderWidth: 1 });
       const wrappedLocalDisclaimer = wrapText(localDisclaimer || '', font, 9, 500);
-      let discLocalY = 320;
+      let discLocalY = 300;
       wrappedLocalDisclaimer.slice(0, 6).forEach(line => {
         page1.drawText(line, { x: 55, y: discLocalY, size: 9, font, color: grayColor });
         discLocalY -= 14;
@@ -310,7 +356,6 @@ export async function POST(req: NextRequest) {
         page1.drawText(activeLabels.noSignature, { x: 120, y: 115, size: 10, font, color: grayColor });
       }
       page1.drawText(lenderName || '-', { x: 50, y: 70, size: 10, font, color: textColor });
-
       // 채무자 서명 박스
       page1.drawRectangle({ x: 322, y: 60, width: 250, height: 140, borderColor: borderGray, borderWidth: 1 });
       page1.drawText(activeLabels.borrowerSignature, { x: 332, y: 180, size: 10, font, color: grayColor });
@@ -333,40 +378,44 @@ export async function POST(req: NextRequest) {
     page2.drawLine({ start: { x: 40, y: 690 }, end: { x: 572, y: 690 }, thickness: 1.5, color: borderGray });
 
     // 당사자 인적 정보 박스 배경
-    page2.drawRectangle({ x: 40, y: 580, width: 532, height: 95, color: lightBackground, borderColor: borderGray, borderWidth: 1 });
+    page2.drawRectangle({ x: 40, y: 560, width: 532, height: 115, color: lightBackground, borderColor: borderGray, borderWidth: 1 });
     
     // 당사자 정보 텍스트
     page2.drawText(`Lender:`, { x: 55, y: 650, size: 10, font, color: grayColor });
     page2.drawText(`${lenderName || '-'} (${lenderPhone || '-'})`, { x: 170, y: 650, size: 10, font, color: textColor });
     
-    page2.drawText(`Borrower:`, { x: 55, y: 625, size: 10, font, color: grayColor });
-    page2.drawText(`${borrowerName || '-'}`, { x: 170, y: 625, size: 10, font, color: textColor });
+    page2.drawText(`Borrower:`, { x: 55, y: 630, size: 10, font, color: grayColor });
+    page2.drawText(`${borrowerName || '-'}`, { x: 170, y: 630, size: 10, font, color: textColor });
     
-    page2.drawText(`Transaction Date:`, { x: 55, y: 600, size: 10, font, color: grayColor });
-    page2.drawText(`${transactionDate || '-'}`, { x: 170, y: 600, size: 10, font, color: textColor });
+    page2.drawText(`Transaction Date:`, { x: 55, y: 610, size: 10, font, color: grayColor });
+    page2.drawText(`${transactionDate || '-'}`, { x: 170, y: 610, size: 10, font, color: textColor });
+
+    // 송금 및 수령 완료 정보
+    const transferStatusEnText = `Transfer Status: Sent (${transferredAt || '-'}) / Received (${receivedAt || '-'})`;
+    page2.drawText(transferStatusEnText, { x: 55, y: 590, size: 9, font, color: primaryColor });
 
     // 거래 조건 표 (Table)
-    page2.drawText('Financial Terms and Conditions', { x: 40, y: 550, size: 12, font, color: textColor });
+    page2.drawText('Financial Terms and Conditions', { x: 40, y: 530, size: 12, font, color: textColor });
     
     // 표 헤더 배경
-    page2.drawRectangle({ x: 40, y: 505, width: 532, height: 30, color: lightBackground, borderColor: borderGray, borderWidth: 1 });
-    page2.drawText('Principal Amount', { x: 55, y: 517, size: 9, font, color: grayColor });
-    page2.drawText('Interest Rate', { x: 180, y: 517, size: 9, font, color: grayColor });
-    page2.drawText('Repayment Amount', { x: 300, y: 517, size: 9, font, color: grayColor });
-    page2.drawText('Due Date', { x: 450, y: 517, size: 9, font, color: grayColor });
+    page2.drawRectangle({ x: 40, y: 485, width: 532, height: 30, color: lightBackground, borderColor: borderGray, borderWidth: 1 });
+    page2.drawText('Principal Amount', { x: 55, y: 497, size: 9, font, color: grayColor });
+    page2.drawText('Interest Rate', { x: 180, y: 497, size: 9, font, color: grayColor });
+    page2.drawText('Repayment Amount', { x: 300, y: 497, size: 9, font, color: grayColor });
+    page2.drawText('Due Date', { x: 450, y: 497, size: 9, font, color: grayColor });
 
     // 표 데이터
-    page2.drawRectangle({ x: 40, y: 465, width: 532, height: 40, borderColor: borderGray, borderWidth: 1 });
-    page2.drawText(amount || '-', { x: 55, y: 480, size: 11, font, color: textColor });
-    page2.drawText(interestRate || '-', { x: 180, y: 480, size: 11, font, color: primaryColor });
-    page2.drawText(repayAmount || '-', { x: 300, y: 480, size: 11, font, color: textColor });
-    page2.drawText(dueDate || '-', { x: 450, y: 480, size: 11, font, color: redColor });
+    page2.drawRectangle({ x: 40, y: 445, width: 532, height: 40, borderColor: borderGray, borderWidth: 1 });
+    page2.drawText(amount || '-', { x: 55, y: 460, size: 11, font, color: textColor });
+    page2.drawText(interestRate || '-', { x: 180, y: 460, size: 11, font, color: primaryColor });
+    page2.drawText(repayAmount || '-', { x: 300, y: 460, size: 11, font, color: textColor });
+    page2.drawText(dueDate || '-', { x: 450, y: 460, size: 11, font, color: redColor });
 
     // 상세 내용 및 연체 규정 박스
-    page2.drawRectangle({ x: 40, y: 360, width: 532, height: 90, color: lightBackground, borderColor: borderGray, borderWidth: 1 });
+    page2.drawRectangle({ x: 40, y: 340, width: 532, height: 90, color: lightBackground, borderColor: borderGray, borderWidth: 1 });
     
     const wrappedEnDesc = wrapText(`Description: ${enDescription || '-'}`, font, 10, 500);
-    let descEnY = 430;
+    let descEnY = 410;
     wrappedEnDesc.slice(0, 2).forEach(line => {
       page2.drawText(line, { x: 55, y: descEnY, size: 10, font, color: textColor });
       descEnY -= 16;
@@ -380,9 +429,9 @@ export async function POST(req: NextRequest) {
     });
 
     // 법적 서약 및 고지 사항
-    page2.drawRectangle({ x: 40, y: 220, width: 532, height: 120, color: lightBackground, borderColor: borderGray, borderWidth: 1 });
+    page2.drawRectangle({ x: 40, y: 210, width: 532, height: 115, color: lightBackground, borderColor: borderGray, borderWidth: 1 });
     const wrappedEnDisclaimer = wrapText(enDisclaimer || '', font, 9, 500);
-    let discEnY2 = 320;
+    let discEnY2 = 300;
     wrappedEnDisclaimer.slice(0, 6).forEach(line => {
       page2.drawText(line, { x: 55, y: discEnY2, size: 9, font, color: grayColor });
       discEnY2 -= 14;
@@ -411,28 +460,36 @@ export async function POST(req: NextRequest) {
 
 
     // ==========================================
-    // 3페이지: 법적 신원 증빙 자료 첨부 (CORS 우회 렌더링)
+    // 3페이지 및 4페이지: 법적 신원 증빙 자료 첨부 (Lender & Borrower 분할)
     // ==========================================
-    if (photos && (photos.front1 || photos.back1 || photos.front2 || photos.back2 || photos.selfie)) {
-      const page3 = pdfDoc.addPage([612, 792]);
+    const renderEvidencePage = async (title: string, personPhotos: any) => {
+      console.log(`[PDF API] renderEvidencePage start. title=${title}, photos=${JSON.stringify(personPhotos)}`);
+      if (!personPhotos) {
+        console.log(`[PDF API] personPhotos is null for title=${title}`);
+        return;
+      }
+      const keys = ['front1', 'back1', 'front2', 'back2', 'selfie'];
+      const hasAnyPhoto = keys.some(k => personPhotos[k]);
+      console.log(`[PDF API] hasAnyPhoto for title=${title} is ${hasAnyPhoto}`);
+      if (!hasAnyPhoto) return;
+
+      const page = pdfDoc.addPage([612, 792]);
       
       // 상단 타이틀 영역
-      page3.drawText('Identity Verification Evidence', { x: 40, y: 720, size: 16, font, color: primaryColor });
-      page3.drawText('Transaction Legal Security Records', { x: 40, y: 700, size: 8, font, color: grayColor });
-      page3.drawLine({ start: { x: 40, y: 690 }, end: { x: 572, y: 690 }, thickness: 1.5, color: borderGray });
+      page.drawText(title, { x: 40, y: 720, size: 16, font, color: primaryColor });
+      page.drawText('Transaction Legal Security Records', { x: 40, y: 700, size: 8, font, color: grayColor });
+      page.drawLine({ start: { x: 40, y: 690 }, end: { x: 572, y: 690 }, thickness: 1.5, color: borderGray });
 
       // 안내 문구
-      page3.drawText(
+      page.drawText(
         'The following documents were securely captured and verified through AI ML Kit scanning during transaction',
         { x: 40, y: 665, size: 8, font, color: textColor }
       );
-      page3.drawText(
-        'agreement to ensure the legal binding and non-repudiation of both parties.',
+      page.drawText(
+        'agreement to ensure the legal binding and non-repudiation.',
         { x: 40, y: 652, size: 8, font, color: textColor }
       );
 
-      // 사진 배치 좌표 계산 (그리드 형태)
-      const photoKeys = ['front1', 'back1', 'front2', 'back2', 'selfie'];
       const photoLabels: Record<string, string> = {
         front1: 'ID FRONT 1',
         back1: 'ID BACK 1',
@@ -447,35 +504,43 @@ export async function POST(req: NextRequest) {
       const cardHeight = 150;
       const gap = 20;
 
-      for (const key of photoKeys) {
-        const imgUrl = photos[key];
+      for (const key of keys) {
+        const imgUrl = personPhotos[key];
+        console.log(`[PDF API] key=${key}, imgUrl=${imgUrl}`);
         if (!imgUrl) continue;
 
-        // 서버에서 이미지 바이너리 다운로드하여 삽입 (CORS 없음)
         const embedImg = await embedImageFromUrl(pdfDoc, imgUrl);
+        console.log(`[PDF API] embedImageResult for key=${key} is ${!!embedImg}`);
         if (embedImg) {
-          // 사진 카드 박스 테두리
-          page3.drawRectangle({ x: xPos, y: yPos, width: cardWidth, height: cardHeight, borderColor: borderGray, borderWidth: 1 });
-          
-          // 사진 이미지 렌더링 (비율 맞추어 조정)
-          page3.drawImage(embedImg, { x: xPos + 10, y: yPos + 30, width: cardWidth - 20, height: cardHeight - 50 });
-          
-          // 라벨 쓰기
-          page3.drawText(photoLabels[key], { x: xPos + 15, y: yPos + 12, size: 8, font, color: grayColor });
+          page.drawRectangle({ x: xPos, y: yPos, width: cardWidth, height: cardHeight, borderColor: borderGray, borderWidth: 1 });
+          page.drawImage(embedImg, { x: xPos + 10, y: yPos + 30, width: cardWidth - 20, height: cardHeight - 50 });
+          page.drawText(photoLabels[key], { x: xPos + 15, y: yPos + 12, size: 8, font, color: grayColor });
 
-          // 다음 열로 이동
           xPos += cardWidth + gap;
           if (xPos + cardWidth > 572) {
             xPos = 40;
-            yPos -= cardHeight + gap; // 다음 행으로 이동
+            yPos -= cardHeight + gap;
           }
         }
+      }
+    };
+
+    console.log('[PDF API] photos value right before render:', JSON.stringify(photos));
+    if (photos) {
+      if (photos.lender || photos.borrower) {
+        console.log('[PDF API] Rendering split pages for lender and borrower');
+        await renderEvidencePage('Lender Identity Verification Evidence', photos.lender);
+        await renderEvidencePage('Borrower Identity Verification Evidence', photos.borrower);
+      } else {
+        console.log('[PDF API] Rendering single fallback page');
+        // 기존 구조 호환을 위한 폴백
+        await renderEvidencePage('Identity Verification Evidence', photos);
       }
     }
 
     // 4. PDF 최종 빌드 및 응답 스트림 전송
     const pdfBytes = await pdfDoc.save();
-    return new NextResponse(pdfBytes, {
+    return new NextResponse(Buffer.from(pdfBytes), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',

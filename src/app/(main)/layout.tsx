@@ -8,18 +8,22 @@ import {
   ScrollText, 
   Package, 
   ShieldCheck,
-  Settings
+  Settings,
+  Info,
+  AlertTriangle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 const getNavItems = (t: (k: string) => string, isAdmin?: boolean) => {
   const items = [
     { name: t('dashboard'), path: '/', icon: Home },
     { name: t('customers'), path: '/customers', icon: Users },
-    { name: t('debts'), path: '/debts', icon: ScrollText },
     { name: t('inventory'), path: '/inventory', icon: Package },
+    { name: t('debts'), path: '/debts', icon: ScrollText },
     { name: t('settings'), path: '/settings', icon: Settings },
   ];
   if (isAdmin) {
@@ -37,6 +41,7 @@ export default function MainLayout({
   const router = useRouter();
   const { user, loading, t, profile } = useAuth();
   const navItems = getNavItems(t, profile?.is_admin === true);
+  const [isDebtsNoticeOpen, setIsDebtsNoticeOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -77,10 +82,18 @@ export default function MainLayout({
             const isActive = pathname === item.path || 
               (item.path !== '/' && pathname.startsWith(item.path));
             
+            const handleItemClick = (e: React.MouseEvent) => {
+              if (item.path === '/debts') {
+                e.preventDefault();
+                setIsDebtsNoticeOpen(true);
+              }
+            };
+            
             return (
               <Link
                 key={item.path}
                 href={item.path}
+                onClick={handleItemClick}
                 className={cn(
                   "relative flex flex-col items-center justify-center rounded-2xl transition-all duration-300",
                   isActive ? "text-amber-500 scale-105" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200",
@@ -105,6 +118,61 @@ export default function MainLayout({
           })}
         </nav>
       </div>
+
+      {/* 외상거래 안내 및 법적 책임 면책 고지 모달 */}
+      <Dialog open={isDebtsNoticeOpen} onOpenChange={setIsDebtsNoticeOpen}>
+        <DialogContent className="max-w-md w-[90%] mx-auto bg-slate-900/95 dark:bg-slate-950/95 text-slate-100 border border-slate-800 dark:border-white/10 rounded-3xl p-6 backdrop-blur-xl animate-in fade-in duration-300">
+          <DialogHeader className="space-y-3">
+            <div className="mx-auto w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+              <Info className="w-6 h-6 text-blue-500" />
+            </div>
+            <DialogTitle className="text-center text-base font-black tracking-tight text-white leading-tight">
+              {t('debts_modal_title')}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="py-2.5 space-y-4 max-h-[40vh] overflow-y-auto scrollbar-hide pr-1 text-slate-300 text-xs leading-relaxed">
+            <div className="space-y-1.5">
+              <p className="font-black text-white">{t('debts_modal_sub1')}</p>
+              <p>{t('debts_modal_desc1_1')}</p>
+              <p>{t('debts_modal_desc1_2')}</p>
+              <p>{t('debts_modal_desc1_3')}</p>
+              <p>{t('debts_modal_desc1_4')}</p>
+            </div>
+
+            <div className="space-y-1.5 pt-3 border-t border-slate-800/80">
+              <div className="flex items-center gap-1.5 text-rose-500 font-black">
+                <AlertTriangle className="w-4 h-4" />
+                <span>{t('debts_modal_sub2')}</span>
+              </div>
+              <p className="text-slate-400 font-medium">
+                {t('debts_modal_desc2')}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t border-slate-800/80">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDebtsNoticeOpen(false)}
+              className="flex-1 h-11 rounded-xl border-slate-800 bg-transparent text-slate-400 hover:text-white hover:bg-slate-800/50 font-bold text-xs active:scale-95 transition-transform"
+            >
+              {t('debts_modal_cancel_btn')}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setIsDebtsNoticeOpen(false);
+                router.push('/debts');
+              }}
+              className="flex-1 h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs shadow-lg shadow-blue-600/20 active:scale-95 transition-all flex items-center justify-center"
+            >
+              {t('debts_modal_agree_btn')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Safe Area Bottom Spacer */}
       <div className="h-safe-area-bottom"></div>
