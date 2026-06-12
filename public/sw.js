@@ -71,7 +71,11 @@ self.addEventListener('fetch', function(event) {
 
         return response;
       }).catch(function() {
-        // 네트워크 실패 시 동작
+        // 네트워크 실패 시 빈 응답이나 408 에러 응답을 반환하여 TypeError 방지
+        return new Response('Network connection failed', {
+          status: 408,
+          statusText: 'Network Error'
+        });
       });
     })
   );
