@@ -56,7 +56,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
           if (!active) return;
           const { barcodes } = await CapScanner.scan();
           if (barcodes && barcodes.length > 0 && active) {
-            onScanRef.current(barcodes[0].rawValue);
+            onScanRef.current(barcodes[0]!.rawValue);
             onCloseRef.current();
           } else {
             onCloseRef.current();
@@ -74,7 +74,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
           throw new Error('camera_not_found');
         }
 
-        let selectedDeviceId = videoInputDevices[0].deviceId;
+        let selectedDeviceId = videoInputDevices[0]!.deviceId;
         for (const device of videoInputDevices) {
           const label = device.label.toLowerCase();
           if (
@@ -117,7 +117,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
               if (videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
                 const barcodes = await detector.detect(videoRef.current);
                 if (barcodes.length > 0 && active) {
-                  onScanRef.current(barcodes[0].rawValue);
+            onScanRef.current(barcodes[0]!.rawValue);
                   onCloseRef.current();
                   return;
                 }

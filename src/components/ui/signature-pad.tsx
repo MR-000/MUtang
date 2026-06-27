@@ -46,8 +46,8 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, onClear }) =
     if (!canvas) return { x: 0, y: 0 };
 
     const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const clientX = 'touches' in e ? e.touches[0]!.clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0]!.clientY : e.clientY;
 
     return {
       x: clientX - rect.left,

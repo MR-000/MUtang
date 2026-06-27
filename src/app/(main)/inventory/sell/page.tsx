@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { bffGet, bffPost } from '@/lib/bff-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -41,14 +41,12 @@ export default function SellProductPage() {
   }, [barcode]);
 
   const fetchProduct = async () => {
-    const { data } = await supabase
-      .from('inventory')
-      .select('*')
-      .eq('user_id', user?.id)
-      .eq('sku', barcode)
-      .single();
-
-    setProduct(data || null);
+    try {
+      const data = await bffGet<any>(`/api/bff/inventory?barcode=${encodeURIComponent(barcode)}`);
+      setProduct(data || null);
+    } catch {
+      setProduct(null);
+    }
   };
 
   const handleScan = (code: string) => {
@@ -61,28 +59,22 @@ export default function SellProductPage() {
 
     setIsSubmitting(true);
     try {
-      // 1. 판매 로그 기록
-      const { error: logError } = await supabase
-        .from('inventory_logs')
-        .insert([{
-          user_id: user?.id,
+      const newStock = Math.max(0, (product.stock ?? 0) - quantity);
+
+      await Promise.all([
+        bffPost('/api/bff/inventory', {
+          action: 'log_transaction',
           barcode: product.sku,
           type: 'sale',
           quantity_change: -quantity,
-          price: product.price
-        }]);
-
-      if (logError) throw logError;
-
-      // 2. inventory 테이블 재고 차감
-      const newStock = Math.max(0, (product.stock ?? 0) - quantity);
-      const { error: stockError } = await supabase
-        .from('inventory')
-        .update({ stock: newStock })
-        .eq('sku', product.sku)
-        .eq('user_id', user?.id);
-
-      if (stockError) throw stockError;
+          price: product.price,
+        }),
+        bffPost('/api/bff/inventory', {
+          action: 'update_stock',
+          sku: product.sku,
+          stock: newStock,
+        }),
+      ]);
 
       toast.success(t('sale_success'));
       setBarcode('');

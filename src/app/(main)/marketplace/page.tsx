@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { bffGet } from '@/lib/bff-client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
@@ -30,21 +30,10 @@ export default function Marketplace() {
 
   const fetchRequests = async () => {
     try {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase
-        .from('matching_requests')
-        .select(`
-          *,
-          poster_profile:profiles!matching_requests_borrower_id_fkey(full_name, trust_tier, trust_score, is_verified)
-        `)
-        .eq('status', 'pending')
-        .is('lender_id', null)
-        .or(`due_date.gte.${todayStr},due_date.is.null`)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const data = await bffGet<{ borrowerPosts: any[] }>('/api/bff/marketplace');
+      const posts = data.borrowerPosts || [];
       
-      const mapped = (data || []).map((req: any) => {
+      const mapped = posts.map((req: any) => {
         let store_type = 'Sari-Sari Store';
         let purpose = 'Business Funding';
         

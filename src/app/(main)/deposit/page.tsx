@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { bffGet, bffPost } from '@/lib/bff-client';
 import { supabase } from '@/lib/supabase';
 import { 
   Wallet, 
@@ -58,19 +59,7 @@ export default function DepositPage() {
 
     const restoreActiveRequest = async () => {
       try {
-        const { data, error } = await supabase
-          .from('deposit_requests')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('status', 'pending')
-          .gt('expires_at', new Date().toISOString())
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        if (error) {
-          console.error('Error fetching active request:', error);
-          return;
-        }
+        const data = await bffGet<any[]>('/api/bff/deposit');
 
         if (data && data.length > 0) {
           const active = data[0];
@@ -109,6 +98,20 @@ export default function DepositPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error('파일 크기가 너무 큽니다. 10MB 이하의 이미지를 선택해 주세요.');
+      e.target.value = '';
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('JPEG, PNG, WebP 형식의 이미지만 업로드 가능합니다.');
+      e.target.value = '';
+      return;
+    }
+
     setProofFile(file);
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -144,48 +147,39 @@ export default function DepositPage() {
         .from('profile-assets')
         .getPublicUrl(filePath);
 
-      const { error: dbError } = await supabase
-        .from('deposit_requests')
-        .update({ proof_image_url: publicUrl })
-        .eq('id', activeRequest.id);
+      await bffPost('/api/bff/deposit', { action: 'update_proof', id: activeRequest.id, proof_image_url: publicUrl });
+      setActiveRequest((prev: any) => prev ? { ...prev, proof_image_url: publicUrl } : null);
+      toast.success('입금증 업로드가 완료되었습니다! 실시간 영수증 분석을 시작합니다.');
+      setProofFile(null);
+      setProofPreview(null);
 
-      if (dbError) {
-        toast.error('입금증 정보 저장에 실패했습니다.');
-      } else {
-        setActiveRequest((prev: any) => prev ? { ...prev, proof_image_url: publicUrl } : null);
-        toast.success('입금증 업로드가 완료되었습니다! 실시간 영수증 분석을 시작합니다.');
-        setProofFile(null);
-        setProofPreview(null);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
 
-        // OCR 검증 API 호출 트리거
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          const token = session?.access_token;
+        const ocrRes = await fetch('/api/payments/ocr-verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+          },
+          body: JSON.stringify({
+            requestId: activeRequest.id,
+            imageUrl: publicUrl
+          })
+        });
 
-          const ocrRes = await fetch('/api/payments/ocr-verify', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': token ? `Bearer ${token}` : ''
-            },
-            body: JSON.stringify({
-              requestId: activeRequest.id,
-              imageUrl: publicUrl
-            })
-          });
-
-          const ocrData = await ocrRes.json();
-          if (ocrRes.ok && ocrData.success) {
-            toast.success('영수증이 자동으로 분석되어 입금 확인 및 크레딧 충전이 즉시 완료되었습니다!');
-            setSuccess(true);
-          } else {
-            console.warn('[OCR 검증 실패]:', ocrData.message || ocrData.error);
-            toast.info(ocrData.message || '영수증 자동 판독에 실패했습니다. 관리자 수동 승인 대기 단계로 인계됩니다.');
-          }
-        } catch (ocrErr) {
-          console.error('[OCR 호출 실패]:', ocrErr);
-          toast.info('영수증 자동 판독 중 네트워크 통신 오류가 발생했습니다. 수동 승인 대기 처리됩니다.');
+        const ocrData = await ocrRes.json();
+        if (ocrRes.ok && ocrData.success) {
+          toast.success('영수증이 자동으로 분석되어 입금 확인 및 크레딧 충전이 즉시 완료되었습니다!');
+          setSuccess(true);
+        } else {
+          console.warn('[OCR 검증 실패]:', ocrData.message || ocrData.error);
+          toast.info(ocrData.message || '영수증 자동 판독에 실패했습니다. 관리자 수동 승인 대기 단계로 인계됩니다.');
         }
+      } catch (ocrErr) {
+        console.error('[OCR 호출 실패]:', ocrErr);
+        toast.info('영수증 자동 판독 중 네트워크 통신 오류가 발생했습니다. 수동 승인 대기 처리됩니다.');
       }
     } catch (err: any) {
       toast.error(err.message);
@@ -414,13 +408,8 @@ export default function DepositPage() {
       
       pollingRef.current = setInterval(async () => {
         try {
-          const { data, error } = await supabase
-            .from('deposit_requests')
-            .select('status')
-            .eq('id', activeRequest.id)
-            .single();
-
-          if (data && data.status === 'completed') {
+          const deposit = await bffGet<any>(`/api/bff/deposit?id=${activeRequest.id}`);
+          if (deposit?.status === 'completed') {
             triggerSuccess();
           }
         } catch (err) {
@@ -488,11 +477,7 @@ export default function DepositPage() {
 
   const handleExpire = async () => {
     try {
-      await supabase
-        .from('deposit_requests')
-        .update({ status: 'expired' })
-        .eq('id', activeRequest?.id);
-
+      await bffPost('/api/bff/deposit', { action: 'expire', id: activeRequest?.id });
       setActiveRequest(prev => prev ? { ...prev, status: 'expired' } : null);
     } catch (e) {
       console.error(e);

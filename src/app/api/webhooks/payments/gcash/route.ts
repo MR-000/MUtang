@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+function verifyWebhookAuth(req: Request): boolean {
+  const apiKey = req.headers.get('x-api-key');
+  const expectedKey = process.env.WEBHOOK_API_KEY;
+  if (!expectedKey) return true;
+  return apiKey === expectedKey;
+}
+
 export async function POST(req: Request) {
   try {
+    if (!verifyWebhookAuth(req)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { message, sender } = await req.json();
 
     console.log(`[GCash SMS Webhook] Received from ${sender}: "${message}"`);

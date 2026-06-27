@@ -15,16 +15,39 @@ import {
 import Link from 'next/link';
 import { TierBadge } from '@/components/ui/tier-badge';
 import { useState, useEffect } from 'react';
+import { bffGet } from '@/lib/bff-client';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 
 export default function Dashboard() {
   const { profile, loading: profileLoading, t, refreshProfile } = useAuth();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [activeLoans, setActiveLoans] = useState(0);
+  const [customerCount, setCustomerCount] = useState(0);
+  const [inventoryCount, setInventoryCount] = useState(0);
+  const [statsLoading, setStatsLoading] = useState(true);
+
   useEffect(() => {
     if (!profile?.id) return;
+
+    const loadStats = async () => {
+      try {
+        const stats = await bffGet<{ activeLoans: number; customerCount: number; inventoryCount: number }>('/api/bff/stats');
+
+        setActiveLoans(stats.activeLoans);
+        setCustomerCount(stats.customerCount);
+        setInventoryCount(stats.inventoryCount);
+      } catch (err) {
+        console.warn('[Dashboard] Failed to load stats:', err);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    loadStats();
 
     const channel = supabase
       .channel(`db_deposit_dashboard_${profile.id}`)
@@ -57,10 +80,10 @@ export default function Dashboard() {
   if (!mounted) return null;
 
   const stats = [
-    { label: t('active_records'), value: '0', icon: ShieldCheck, color: 'text-blue-500' },
+    { label: t('active_records'), value: statsLoading ? '-' : String(activeLoans), icon: ShieldCheck, color: 'text-blue-500' },
     { label: t('reputation'), value: <TierBadge tier={profile?.trust_tier || 'Bronze'} />, icon: TrendingUp, color: 'text-amber-500' },
-    { label: t('customers'), value: '0', icon: Users, color: 'text-emerald-500' },
-    { label: t('inventory'), value: '0', icon: Package, color: 'text-indigo-500' },
+    { label: t('customers'), value: statsLoading ? '-' : String(customerCount), icon: Users, color: 'text-emerald-500' },
+    { label: t('inventory'), value: statsLoading ? '-' : String(inventoryCount), icon: Package, color: 'text-indigo-500' },
   ];
 
   return (

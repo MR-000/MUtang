@@ -1,5 +1,6 @@
 "use client";
 
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -163,7 +164,9 @@ export default function MainLayout({
         )}
 
         <div className="flex-1 overflow-y-auto px-6 pt-6 scrollbar-hide">
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </div>
       </main>
 

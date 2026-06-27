@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { bffPost } from '@/lib/bff-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -44,28 +44,16 @@ export default function RegisterProductPage() {
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('inventory')
-        .insert([{
-          user_id: user?.id,
-          sku: barcode,
-          name: name,
-          price: parseFloat(price),
-          stock: 0
-        }]);
-
-      if (error) {
-        if (error.code === '23505') {
-          toast.error(t('duplicate_barcode'));
-        } else {
-          throw error;
-        }
-      } else {
-        toast.success(t('product_registered'));
-        router.push('/inventory');
-      }
+      await bffPost('/api/bff/inventory', {
+        action: 'register',
+        sku: barcode,
+        name,
+        price: parseFloat(price),
+      });
+      toast.success(t('product_registered'));
+      router.push('/inventory');
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(t('duplicate_barcode'));
     } finally {
       setIsSubmitting(false);
     }

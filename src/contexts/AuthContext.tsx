@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { bffGet } from '@/lib/bff-client';
 import { getTranslation } from '@/lib/i18n';
 import { initDebugTools } from '@/lib/debug-tools';
 
@@ -33,13 +34,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [language, setLanguageState] = useState<Language>('en');
   const [theme, setThemeState] = useState<Theme>('dark');
 
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    setProfile(data);
+  const fetchProfile = async (_userId: string) => {
+    try {
+      const data = await bffGet('/api/bff/me');
+      setProfile(data);
+    } catch {
+      setProfile(null);
+    }
   };
 
   const refreshProfile = async () => {
@@ -56,7 +57,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } else {
       // 첫 접속 시 브라우저 기본 로케일 감지 및 5대 지원 언어 매핑
       const browserLang = (typeof navigator !== 'undefined' && navigator.language) 
-        ? navigator.language.split('-')[0].toLowerCase() 
+        ? navigator.language.split('-')[0]?.toLowerCase() ?? 'en' 
         : 'en';
       const supportedLangs: Language[] = ['en', 'tl', 'ko', 'zh', 'ja'];
       const defaultLang = supportedLangs.includes(browserLang as Language) ? (browserLang as Language) : 'en';

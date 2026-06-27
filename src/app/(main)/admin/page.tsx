@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
+import { bffGet, bffPost } from "@/lib/bff-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,7 +30,13 @@ import {
   Check,
   XCircle,
   Clock,
-  Sparkles
+  Sparkles,
+  LayoutDashboard,
+  Server,
+  Activity,
+  CreditCard,
+  Database,
+  RefreshCw
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -84,8 +90,12 @@ interface DepositRequest {
 
 export default function AdminConsole() {
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState<"settings" | "users" | "notifications" | "logs">("settings");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "settings" | "users" | "notifications" | "logs" | "system">("dashboard");
   const [loading, setLoading] = useState(true);
+
+  // 대시보드 통계
+  const [stats, setStats] = useState<Record<string, any>>({});
+  const [ocrHealth, setOcrHealth] = useState<{ status: string; message: string }>({ status: 'checking', message: '확인 중...' });
 
   // 1. 수수료 및 정책 상태
   const [feeRate, setFeeRate] = useState("1");
@@ -131,69 +141,25 @@ export default function AdminConsole() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 수수료율 설정 로드
-      const { data: settingsData, error: settingsErr } = await supabase
-        .from("system_settings")
-        .select("*")
-        .eq("key", "credit_fee_rate")
-        .single();
-      
+      const [settingsData, usersData, loansData, proofsData, depositsData, statsData] = await Promise.all([
+        bffGet<any>('/api/bff/settings?key=credit_fee_rate'),
+        bffGet<any[]>('/api/bff/admin?resource=profiles'),
+        bffGet<any[]>('/api/bff/loans?admin=true'),
+        bffGet<any[]>('/api/bff/admin?resource=payment_proofs'),
+        bffGet<any[]>('/api/bff/admin?resource=deposits'),
+        bffGet<any>('/api/bff/admin?resource=stats'),
+      ]);
+
       if (settingsData) {
         setFeeRate((parseFloat(settingsData.value) * 100).toString());
         setFeeDescription(settingsData.description || "");
       }
 
-      // 회원 목록 로드
-      const { data: usersData, error: usersErr } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("updated_at", { ascending: false });
-      
       if (usersData) setUsers(usersData);
-
-      // 외상거래 로그 로드
-      const { data: loansData, error: loansErr } = await supabase
-        .from("loans")
-        .select(`
-          *,
-          lender:profiles!loans_lender_id_fkey(full_name),
-          borrower:profiles!loans_borrower_id_fkey(full_name)
-        `)
-        .order("created_at", { ascending: false });
-      
       if (loansData) setLoans(loansData as any);
-
-      // 결제 증빙(거래증) 로드
-      const { data: proofsData, error: proofsErr } = await supabase
-        .from("payment_proofs")
-        .select("*")
-        .order("created_at", { ascending: false });
-
       if (proofsData) setPaymentProofs(proofsData);
-
-      // 충전 요청 건 로드
-      const { data: depositsData, error: depositsErr } = await supabase
-        .from("deposit_requests")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (depositsData) {
-        // 회원 매칭 조인
-        const extendedDeposits = await Promise.all(
-          depositsData.map(async (dep) => {
-            const { data: prof } = await supabase
-              .from("profiles")
-              .select("full_name, phone")
-              .eq("id", dep.user_id)
-              .single();
-            return {
-              ...dep,
-              profile: prof ? { full_name: prof.full_name, phone: prof.phone } : { full_name: "미확인 유저", phone: "" }
-            };
-          })
-        );
-        setDepositRequests(extendedDeposits as any);
-      }
+      if (depositsData) setDepositRequests(depositsData as any);
+      if (statsData) setStats(statsData);
 
     } catch (e: any) {
       console.error(e);
@@ -203,9 +169,30 @@ export default function AdminConsole() {
     }
   };
 
+  const checkOcrHealth = async () => {
+    setOcrHealth({ status: 'checking', message: '연결 확인 중...' });
+    try {
+      const res = await fetch('http://localhost:8000/health', { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const data = await res.json();
+        setOcrHealth({ status: 'online', message: `${data.ocr} / ${data.structure} / ${data.face}` });
+      } else {
+        setOcrHealth({ status: 'error', message: `HTTP ${res.status}` });
+      }
+    } catch {
+      setOcrHealth({ status: 'offline', message: 'OCR 서버에 연결할 수 없습니다' });
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'system') {
+      checkOcrHealth();
+    }
+  }, [activeTab]);
 
   // 1. 수수료 설정 저장
   const handleSaveSettings = async () => {
@@ -218,15 +205,12 @@ export default function AdminConsole() {
         return;
       }
 
-      const { error } = await supabase
-        .from("system_settings")
-        .update({ 
-          value: parsedRate.toString(),
-          description: `외상거래 수수료 비율 (${feeRate}% = ${parsedRate})`
-        })
-        .eq("key", "credit_fee_rate");
-
-      if (error) throw error;
+      await bffPost('/api/bff/settings', {
+        action: 'update',
+        key: 'credit_fee_rate',
+        value: parsedRate.toString(),
+        description: `외상거래 수수료 비율 (${feeRate}% = ${parsedRate})`,
+      });
       toast.success(`외상거래 수수료율이 ${feeRate}%로 업데이트되었습니다.`);
       fetchData();
     } catch (err: any) {
@@ -266,30 +250,24 @@ export default function AdminConsole() {
         }
       }
 
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          credit: updatedCredit,
-          trust_score: updatedTrustScore,
-          trust_tier: selectedTier
-        })
-        .eq("id", selectedUser.id);
+      await bffPost('/api/bff/admin', {
+        action: 'update_user',
+        user_id: selectedUser.id,
+        credit: updatedCredit,
+        trust_score: updatedTrustScore,
+        trust_tier: selectedTier,
+      });
 
-      if (error) throw error;
-
-      // 크레딧 변동 알림 발송
       if (creditAdjustment.trim()) {
         const adjustment = parseFloat(creditAdjustment);
         if (!isNaN(adjustment)) {
           const actionText = adjustment >= 0 ? `₱${adjustment} 가산 충전` : `₱${Math.abs(adjustment)} 차감 조정`;
-          await supabase
-            .from("notifications")
-            .insert({
-              user_id: selectedUser.id,
-              title: "관리자 크레딧 변동 알림",
-              message: `관리자 계정에 의해 사용 크레딧이 ${actionText} 되었습니다. 현재 잔액: ₱${updatedCredit}`,
-              type: "deposit"
-            });
+          await bffPost('/api/bff/notifications', {
+            user_id: selectedUser.id,
+            title: "관리자 크레딧 변동 알림",
+            message: `관리자 계정에 의해 사용 크레딧이 ${actionText} 되었습니다. 현재 잔액: ₱${updatedCredit}`,
+            type: "deposit"
+          });
         }
       }
 
@@ -306,23 +284,16 @@ export default function AdminConsole() {
   const handleToggleVerification = async (user: UserProfile) => {
     try {
       const nextStatus = !user.is_verified;
-      const { error } = await supabase
-        .from("profiles")
-        .update({ is_verified: nextStatus })
-        .eq("id", user.id);
+      await bffPost('/api/bff/admin', { action: 'verify_user', user_id: user.id, is_verified: nextStatus });
 
-      if (error) throw error;
-
-      await supabase
-        .from("notifications")
-        .insert({
-          user_id: user.id,
-          title: nextStatus ? "ID 본인인증 승인" : "ID 본인인증 보류",
-          message: nextStatus 
-            ? "축하합니다! 신분증 검증이 완료되어 정식 ID 본인인증 회원으로 전환되었습니다." 
-            : "보안 검토 정책에 따라 회원님의 신분증 검증 상태가 보류/반려 처리되었습니다.",
-          type: "system"
-        });
+      await bffPost('/api/bff/notifications', {
+        user_id: user.id,
+        title: nextStatus ? "ID 본인인증 승인" : "ID 본인인증 보류",
+        message: nextStatus 
+          ? "축하합니다! 신분증 검증이 완료되어 정식 ID 본인인증 회원으로 전환되었습니다." 
+          : "보안 검토 정책에 따라 회원님의 신분증 검증 상태가 보류/반려 처리되었습니다.",
+        type: "system"
+      });
 
       toast.success(`${user.full_name || "회원"}님의 본인인증 상태를 변경했습니다.`);
       
@@ -346,31 +317,22 @@ export default function AdminConsole() {
     setIsSendingNotification(true);
     try {
       if (targetUserId === "all") {
-        // 전체 회원 발송
-        const notificationPromises = users.map(u => 
-          supabase
-            .from("notifications")
-            .insert({
-              user_id: u.id,
-              title: notificationTitle.trim(),
-              message: notificationMessage.trim(),
-              type: "system"
-            })
-        );
-        await Promise.all(notificationPromises);
-        toast.success(`가입된 회원 ${users.length}명 전체에게 알림을 성공적으로 발송했습니다.`);
-      } else {
-        // 개별 회원 발송
-        const { error } = await supabase
-          .from("notifications")
-          .insert({
-            user_id: targetUserId,
+        await Promise.all(users.map(u => 
+          bffPost('/api/bff/notifications', {
+            user_id: u.id,
             title: notificationTitle.trim(),
             message: notificationMessage.trim(),
             type: "system"
-          });
-        
-        if (error) throw error;
+          })
+        ));
+        toast.success(`가입된 회원 ${users.length}명 전체에게 알림을 성공적으로 발송했습니다.`);
+      } else {
+        await bffPost('/api/bff/notifications', {
+          user_id: targetUserId,
+          title: notificationTitle.trim(),
+          message: notificationMessage.trim(),
+          type: "system"
+        });
         const targetUser = users.find(u => u.id === targetUserId);
         toast.success(`${targetUser?.full_name || "지정 회원"}님에게 알림이 발송되었습니다.`);
       }
@@ -389,43 +351,19 @@ export default function AdminConsole() {
   const handleApproveDeposit = async (req: DepositRequest) => {
     setIsProcessingDeposit(true);
     try {
-      // 1. 사용자 기존 크레딧 조회
-      const { data: userProfile, error: profileErr } = await supabase
-        .from("profiles")
-        .select("credit")
-        .eq("id", req.user_id)
-        .single();
-      
-      if (profileErr) throw profileErr;
+      await bffPost('/api/bff/admin', {
+        action: 'process_deposit',
+        user_id: req.user_id,
+        amount: req.amount,
+        deposit_id: req.id,
+      });
 
-      const currentCredit = parseFloat(userProfile.credit?.toString() || "0");
-      const newCredit = currentCredit + parseFloat(req.amount.toString());
-
-      // 2. 크레딧 업데이트
-      const { error: updateProfileErr } = await supabase
-        .from("profiles")
-        .update({ credit: newCredit })
-        .eq("id", req.user_id);
-      
-      if (updateProfileErr) throw updateProfileErr;
-
-      // 3. 충전 요청 완료
-      const { error: updateReqErr } = await supabase
-        .from("deposit_requests")
-        .update({ status: "completed" })
-        .eq("id", req.id);
-      
-      if (updateReqErr) throw updateReqErr;
-
-      // 4. 알림 발송
-      await supabase
-        .from("notifications")
-        .insert({
-          user_id: req.user_id,
-          title: "크레딧 충전 완료",
-          message: `요청하신 ₱${Number(req.amount).toLocaleString()} 크레딧이 정상 충전 완료되었습니다.`,
-          type: "deposit"
-        });
+      await bffPost('/api/bff/notifications', {
+        user_id: req.user_id,
+        title: "크레딧 충전 완료",
+        message: `요청하신 ₱${Number(req.amount).toLocaleString()} 크레딧이 정상 충전 완료되었습니다.`,
+        type: "deposit"
+      });
 
       toast.success("입금 충전 승인이 정상 완료되었습니다.");
       fetchData();
@@ -445,21 +383,14 @@ export default function AdminConsole() {
     
     setIsProcessingDeposit(true);
     try {
-      const { error: updateReqErr } = await supabase
-        .from("deposit_requests")
-        .update({ status: "rejected" })
-        .eq("id", selectedDeposit.id);
+      await bffPost('/api/bff/deposit', { action: 'reject', id: selectedDeposit.id });
 
-      if (updateReqErr) throw updateReqErr;
-
-      await supabase
-        .from("notifications")
-        .insert({
-          user_id: selectedDeposit.user_id,
-          title: "크레딧 충전 반려",
-          message: `충전 요청이 반려되었습니다. 반려 사유: ${rejectReason.trim()}`,
-          type: "deposit"
-        });
+      await bffPost('/api/bff/notifications', {
+        user_id: selectedDeposit.user_id,
+        title: "크레딧 충전 반려",
+        message: `충전 요청이 반려되었습니다. 반려 사유: ${rejectReason.trim()}`,
+        type: "deposit"
+      });
 
       toast.success("충전 요청이 정상적으로 반려 및 취소되었습니다.");
       setIsRejectModalOpen(false);
@@ -501,23 +432,25 @@ export default function AdminConsole() {
         </div>
 
         {/* 탭 네비게이션 */}
-        <div className="grid grid-cols-4 bg-slate-100 dark:bg-white/5 p-1 rounded-[20px] backdrop-blur-sm gap-0.5">
+        <div className="grid grid-cols-6 bg-slate-100 dark:bg-white/5 p-1 rounded-[20px] backdrop-blur-sm gap-0.5">
           {[
+            { id: "dashboard", icon: LayoutDashboard, label: "대시보드" },
             { id: "settings", icon: Settings, label: "정책" },
             { id: "users", icon: Users, label: "회원" },
             { id: "notifications", icon: Bell, label: "알림" },
-            { id: "logs", icon: History, label: "로그" }
+            { id: "logs", icon: History, label: "로그" },
+            { id: "system", icon: Server, label: "시스템" },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`py-3 rounded-[16px] text-[10px] font-black transition-all duration-300 flex flex-col items-center justify-center gap-1 ${
+              className={`py-2.5 rounded-[14px] text-[9px] font-black transition-all duration-300 flex flex-col items-center justify-center gap-0.5 ${
                 activeTab === tab.id
                   ? "bg-white dark:bg-blue-600 shadow-md text-blue-600 dark:text-white scale-[1.03]"
                   : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
               }`}
             >
-              <tab.icon className="w-4 h-4" />
+              <tab.icon className="w-3.5 h-3.5" />
               <span>{tab.label}</span>
             </button>
           ))}
@@ -532,7 +465,121 @@ export default function AdminConsole() {
       ) : (
         <div className="space-y-6">
           
-          {/* 탭 1: 수수료 및 정책 관리 */}
+          {/* 탭 1: 대시보드 */}
+          {activeTab === "dashboard" && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-3 duration-500">
+              {/* 상단 요약 카드 4개 */}
+              <div className="grid grid-cols-2 gap-3">
+                <Card className="p-4 rounded-[20px] bg-white dark:bg-slate-900/50 border-slate-100 dark:border-white/5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">가입 회원</span>
+                  </div>
+                  <p className="text-3xl font-black text-slate-900 dark:text-white">{stats.totalUsers ?? 0}</p>
+                </Card>
+                <Card className="p-4 rounded-[20px] bg-white dark:bg-slate-900/50 border-slate-100 dark:border-white/5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                      <Activity className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">진행중 외상</span>
+                  </div>
+                  <p className="text-3xl font-black text-slate-900 dark:text-white">{stats.activeLoans ?? 0}</p>
+                </Card>
+                <Card className="p-4 rounded-[20px] bg-white dark:bg-slate-900/50 border-slate-100 dark:border-white/5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">충전 대기</span>
+                  </div>
+                  <p className="text-3xl font-black text-amber-600">{stats.pendingDeposits ?? 0}</p>
+                </Card>
+                <Card className="p-4 rounded-[20px] bg-white dark:bg-slate-900/50 border-slate-100 dark:border-white/5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center">
+                      <AlertTriangle className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">연체 외상</span>
+                  </div>
+                  <p className="text-3xl font-black text-rose-600">{stats.overdueLoans ?? 0}</p>
+                </Card>
+              </div>
+
+              {/* 추가 통계 카드 */}
+              <Card className="p-5 rounded-[24px] bg-white dark:bg-slate-900/50 border-slate-100 dark:border-white/5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-sm dark:text-white">시스템 종합 현황</h3>
+                      <p className="text-[9px] text-slate-400 font-bold">실시간 집계 기준</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div className="p-3 bg-slate-50 dark:bg-white/5 rounded-xl">
+                    <span className="text-slate-400 font-bold text-[10px] block">총 시스템 크레딧</span>
+                    <span className="text-lg font-black text-slate-900 dark:text-white">₱{Number(stats.totalCredit || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="p-3 bg-slate-50 dark:bg-white/5 rounded-xl">
+                    <span className="text-slate-400 font-bold text-[10px] block">완료된 충전</span>
+                    <span className="text-lg font-black text-slate-900 dark:text-white">{stats.completedDeposits ?? 0}건</span>
+                  </div>
+                </div>
+              </Card>
+
+              {/* 빠른 실행 */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setActiveTab("users")}
+                  className="p-4 rounded-[20px] bg-white dark:bg-slate-900/50 border border-slate-100 dark:border-white/5 shadow-sm active:scale-95 transition-all text-left"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center mb-2">
+                    <Users className="w-4.5 h-4.5" />
+                  </div>
+                  <p className="font-extrabold text-sm dark:text-white">회원 관리</p>
+                  <p className="text-[9px] text-slate-400 font-bold mt-0.5">크레딧 및 등급 조정</p>
+                </button>
+                <button
+                  onClick={() => setActiveTab("logs")}
+                  className="p-4 rounded-[20px] bg-white dark:bg-slate-900/50 border border-slate-100 dark:border-white/5 shadow-sm active:scale-95 transition-all text-left"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center mb-2">
+                    <Coins className="w-4.5 h-4.5" />
+                  </div>
+                  <p className="font-extrabold text-sm dark:text-white">충전 승인</p>
+                  <p className="text-[9px] text-slate-400 font-bold mt-0.5">대기 중인 입금 처리</p>
+                </button>
+                <button
+                  onClick={() => setActiveTab("notifications")}
+                  className="p-4 rounded-[20px] bg-white dark:bg-slate-900/50 border border-slate-100 dark:border-white/5 shadow-sm active:scale-95 transition-all text-left"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center mb-2">
+                    <Bell className="w-4.5 h-4.5" />
+                  </div>
+                  <p className="font-extrabold text-sm dark:text-white">알림 발송</p>
+                  <p className="text-[9px] text-slate-400 font-bold mt-0.5">전체/개별 공지 전송</p>
+                </button>
+                <button
+                  onClick={() => setActiveTab("system")}
+                  className="p-4 rounded-[20px] bg-white dark:bg-slate-900/50 border border-slate-100 dark:border-white/5 shadow-sm active:scale-95 transition-all text-left"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center mb-2">
+                    <Server className="w-4.5 h-4.5" />
+                  </div>
+                  <p className="font-extrabold text-sm dark:text-white">시스템 상태</p>
+                  <p className="text-[9px] text-slate-400 font-bold mt-0.5">OCR 서버 및 환경</p>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 탭 2: 수수료 및 정책 관리 */}
           {activeTab === "settings" && (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-3 duration-500">
               <Card className="p-6 rounded-[32px] border-slate-100 dark:border-white/5 bg-white dark:bg-slate-900/50 space-y-6 border-b-4 border-b-slate-100 dark:border-b-white/5 shadow-sm">
@@ -593,7 +640,7 @@ export default function AdminConsole() {
             </div>
           )}
 
-          {/* 탭 2: 회원 관리 디렉토리 */}
+          {/* 탭 3: 회원 관리 디렉토리 */}
           {activeTab === "users" && (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-3 duration-500">
               <div className="relative group">
@@ -663,7 +710,7 @@ export default function AdminConsole() {
             </div>
           )}
 
-          {/* 탭 3: 알림 및 공지 센터 */}
+          {/* 탭 4: 알림 및 공지 센터 */}
           {activeTab === "notifications" && (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-3 duration-500">
               <Card className="p-6 rounded-[32px] border-slate-100 dark:border-white/5 bg-white dark:bg-slate-900/50 space-y-5 border-b-4 border-b-slate-100 dark:border-b-white/5 shadow-sm">
@@ -680,7 +727,7 @@ export default function AdminConsole() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label className="font-black text-[10px] uppercase tracking-wider text-slate-400">수신 대상 설정</Label>
-                    <Select value={targetUserId} onValueChange={setTargetUserId}>
+                    <Select value={targetUserId} onValueChange={(value) => { if (value !== null) setTargetUserId(value); }}>
                       <SelectTrigger className="h-12 rounded-xl bg-slate-50 dark:bg-white/5 border-none font-bold">
                         <SelectValue placeholder="수신자 선택" />
                       </SelectTrigger>
@@ -734,7 +781,78 @@ export default function AdminConsole() {
             </div>
           )}
 
-          {/* 탭 4: 거래 로그 & 충전 승인 */}
+          {/* 탭 5: 시스템 상태 */}
+          {activeTab === "system" && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-3 duration-500">
+              {/* OCR 서버 상태 */}
+              <Card className="p-6 rounded-[32px] border-slate-100 dark:border-white/5 bg-white dark:bg-slate-900/50 space-y-5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      ocrHealth.status === 'online' ? 'bg-emerald-500/10 text-emerald-600' :
+                      ocrHealth.status === 'checking' ? 'bg-amber-500/10 text-amber-600' :
+                      'bg-rose-500/10 text-rose-600'
+                    }`}>
+                      <Database className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-sm dark:text-white">OCR 서버 상태</h3>
+                      <p className="text-[9px] text-slate-400 font-bold">PaddleOCR + InsightFace</p>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-black px-3 py-1 rounded-full ${
+                    ocrHealth.status === 'online' ? 'bg-emerald-500/10 text-emerald-600' :
+                    ocrHealth.status === 'checking' ? 'bg-amber-500/10 text-amber-600' :
+                    'bg-rose-500/10 text-rose-600'
+                  }`}>
+                    {ocrHealth.status === 'online' ? 'ONLINE' : ocrHealth.status === 'checking' ? '확인중' : 'OFFLINE'}
+                  </span>
+                </div>
+                <div className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl text-xs">
+                  <p className="font-bold text-slate-500">{ocrHealth.message}</p>
+                </div>
+                <Button
+                  onClick={checkOcrHealth}
+                  variant="outline"
+                  className="w-full h-12 rounded-2xl font-bold text-xs flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  상태 새로고침
+                </Button>
+              </Card>
+
+              {/* 환경 정보 */}
+              <Card className="p-6 rounded-[32px] border-slate-100 dark:border-white/5 bg-white dark:bg-slate-900/50 space-y-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                    <Server className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm dark:text-white">서버 환경</h3>
+                    <p className="text-[9px] text-slate-400 font-bold">배포 및 실행 정보</p>
+                  </div>
+                </div>
+                <div className="space-y-2 text-xs">
+                  {[
+                    ['앱 버전', '1.0.0'],
+                    ['런타임', 'Node.js + Next.js 15'],
+                    ['데이터베이스', 'Supabase PostgreSQL'],
+                    ['OCR 엔진', 'PP-OCRv6 Medium / PP-StructureV3'],
+                    ['얼굴 인증', 'InsightFace buffalo_sc'],
+                    ['알림', 'PWA Push + In-App'],
+                    ['결제', 'GCash / Solana USDT'],
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex justify-between items-center py-1.5 border-b border-slate-100 dark:border-white/5 last:border-0">
+                      <span className="text-slate-400 font-bold">{label}</span>
+                      <span className="text-slate-700 dark:text-slate-300 font-extrabold text-right">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* 탭 6: 거래 로그 & 충전 승인 */}
           {activeTab === "logs" && (
             <div className="space-y-5 animate-in fade-in slide-in-from-bottom-3 duration-500">
               
@@ -961,7 +1079,7 @@ export default function AdminConsole() {
                   </div>
                   <div className="space-y-2">
                     <Label className="font-black text-[10px] uppercase tracking-wider text-slate-400">신용 등급 부여</Label>
-                    <Select value={selectedTier} onValueChange={setSelectedTier}>
+                    <Select value={selectedTier} onValueChange={(value) => { if (value !== null) setSelectedTier(value); }}>
                       <SelectTrigger className="h-12 rounded-xl bg-slate-50 dark:bg-white/5 border-none font-bold">
                         <SelectValue placeholder="등급" />
                       </SelectTrigger>

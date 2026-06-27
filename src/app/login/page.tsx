@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { ShieldCheck, Phone, Mail, Globe, ArrowRight, Lock } from 'lucide-react';
+import { ShieldCheck, Phone, Globe, ArrowRight, Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function Login() {
@@ -32,11 +32,21 @@ export default function Login() {
   const handleSendOtp = async (e: React.FormEvent, currentMode: 'login' | 'signup') => {
     e.preventDefault();
     
-    // Admin ID Bypass Detection
-    if (phoneNumber === 'tkdghksl0531@gmail.com') {
-      setStep('admin_pass');
-      toast.info(t('toast_admin_detected'));
-      return;
+    // Admin ID Bypass Detection (server-side check)
+    try {
+      const res = await fetch('/api/auth/check-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: phoneNumber }),
+      });
+      const { isAdmin } = await res.json();
+      if (isAdmin) {
+        setStep('admin_pass');
+        toast.info(t('toast_admin_detected'));
+        return;
+      }
+    } catch {
+      // fall through to normal flow on network error
     }
 
     setLoading(true);
@@ -60,13 +70,24 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      // For Admin, we use email/password login internally
-      const { error } = await supabase.auth.signInWithPassword({
-        email: 'tkdghksl0531@gmail.com',
-        password: adminPassword,
+      const res = await fetch('/api/auth/admin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: phoneNumber,
+          password: adminPassword,
+        }),
       });
 
-      if (error) throw error;
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+
+      const { error: sessionError } = await supabase.auth.setSession(data.session);
+      if (sessionError) throw sessionError;
+
       toast.success(t('toast_admin_success'));
       router.push('/');
     } catch (error: any) {
@@ -186,32 +207,7 @@ export default function Login() {
                     <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
 
-                  <div className="relative flex items-center py-4">
-                    <div className="flex-grow border-t border-white/5"></div>
-                    <span className="flex-shrink mx-4 text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">{t('partner_portals')}</span>
-                    <div className="flex-grow border-t border-white/5"></div>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <Button 
-                      type="button"
-                      variant="outline" 
-                      className="h-14 rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10 transition-colors gap-2 font-bold"
-                      onClick={() => toast.info(t('toast_google_ready'))}
-                    >
-                      <Globe className="w-5 h-5 text-blue-400" />
-                      Google
-                    </Button>
-                    <Button 
-                      type="button"
-                      variant="outline" 
-                      className="h-14 rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10 transition-colors gap-2 font-bold"
-                      onClick={() => toast.info(t('toast_facebook_ready'))}
-                    >
-                      <Mail className="w-5 h-5 text-indigo-400" />
-                      Email
-                    </Button>
-                  </div>
                 </div>
 
                 <div className="text-center mt-8">

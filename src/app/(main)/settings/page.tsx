@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { bffGet, bffPatch } from '@/lib/bff-client';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,15 +24,19 @@ import {
   ChevronRight,
   Bell,
   BellOff,
-  Wallet
+  Wallet,
+  MessageSquare,
+  ExternalLink
 } from 'lucide-react';
 import Link from 'next/link';
+import ContactModal from '@/components/ui/ContactModal';
 
 export default function SettingsPage() {
   const { user, profile: globalProfile, t, language, setLanguage, theme, setTheme, signOut, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [notifLoading, setNotifLoading] = useState(false);
   const [notifStatus, setNotifStatus] = useState<'granted' | 'denied' | 'default' | 'unsupported'>('default');
+  const [contactOpen, setContactOpen] = useState(false);
   const [profile, setProfile] = useState({
     full_name: '',
     id_number: '',
@@ -55,13 +60,8 @@ export default function SettingsPage() {
   }, [user]);
 
   const fetchProfile = async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user?.id)
-      .single();
-
-    if (data) {
+    try {
+      const data = await bffGet<any>('/api/bff/me');
       setProfile({
         full_name: data.full_name || '',
         id_number: data.id_number || '',
@@ -71,6 +71,8 @@ export default function SettingsPage() {
         gcash_number: data.gcash_number || '',
         solana_wallet: data.solana_wallet || ''
       });
+    } catch (err: any) {
+      console.error('Failed to load profile:', err);
     }
   };
 
@@ -78,16 +80,12 @@ export default function SettingsPage() {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase
-      .from('profiles')
-      .update(profile)
-      .eq('id', user?.id);
-
-    if (error) {
-      toast.error(error.message);
-    } else {
-      await refreshProfile(); // Sync global state
+    try {
+      await bffPatch('/api/bff/me', profile);
+      await refreshProfile();
       toast.success(t('profile_updated'));
+    } catch (err: any) {
+      toast.error(err.message);
     }
     setLoading(false);
   };
@@ -95,6 +93,20 @@ export default function SettingsPage() {
   const handleQRUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error('파일 크기가 너무 큽니다. 5MB 이하의 이미지를 선택해 주세요.');
+      e.target.value = '';
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('JPEG, PNG, WebP 형식의 이미지만 업로드 가능합니다.');
+      e.target.value = '';
+      return;
+    }
 
     setLoading(true);
     try {
@@ -116,18 +128,9 @@ export default function SettingsPage() {
         // Update local state
         setProfile(prev => ({ ...prev, gcash_qr_url: publicUrl }));
         
-        // Automatically update the database for the QR code
-        const { error: dbError } = await supabase
-          .from('profiles')
-          .update({ gcash_qr_url: publicUrl })
-          .eq('id', user?.id);
-
-        if (dbError) {
-          toast.error(t('qr_save_failed'));
-        } else {
-          await refreshProfile(); // Sync global state
-          toast.success(t('qr_uploaded'));
-        }
+        await bffPatch('/api/bff/me', { gcash_qr_url: publicUrl });
+        await refreshProfile();
+        toast.success(t('qr_uploaded'));
       }
     } catch (err: any) {
       toast.error(err.message || 'QR 이미지 압축 및 업로드 중 실패했습니다.');
@@ -275,6 +278,25 @@ export default function SettingsPage() {
         )}
       </Card>
 
+      {/* Contact Support Card */}
+      <Card
+        onClick={() => setContactOpen(true)}
+        className="p-5 bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm active:scale-[0.98] transition-all cursor-pointer"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 text-blue-600">
+              <MessageSquare className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-bold text-slate-900 dark:text-white text-sm">문의하기</p>
+              <p className="text-xs text-slate-500">관리자에게 메시지 보내기</p>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-slate-400" />
+        </div>
+      </Card>
+
       {/* Language & Theme Card */}
       <Card className="p-4 bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm">
         <div className="grid grid-cols-2 gap-4">
@@ -420,6 +442,29 @@ export default function SettingsPage() {
           {loading ? t('saving') : t('save_profile')}
         </Button>
       </form>
+
+      {/* Logout Card */}
+      <Card className="p-5 bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-red-100 dark:bg-red-900/30 text-red-500">
+              <LogOut className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-bold text-slate-900 dark:text-white text-sm">로그아웃</p>
+              <p className="text-xs text-slate-500">현재 계정에서 로그아웃합니다</p>
+            </div>
+          </div>
+          <button
+            onClick={() => signOut()}
+            className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition-all active:scale-95"
+          >
+            로그아웃
+          </button>
+        </div>
+      </Card>
+
+      <ContactModal open={contactOpen} onOpenChange={setContactOpen} />
     </div>
   );
 }

@@ -17,7 +17,7 @@ export default function MLIDCamera({ mode, onCapture, onClose, t }: MLIDCameraPr
   const streamRef = useRef<MediaStream | null>(null);
   const [loading, setLoading] = useState(true);
   const [facingMode, setFacingMode] = useState<AsyncFacingMode>(mode === 'selfie' ? 'user' : 'environment');
-  const [analyzingText, setAnalyzingText] = useState('Google ML Kit AI 분석 대기 중...');
+  const [analyzingText, setAnalyzingText] = useState('AI 화질 분석 대기 중...');
 
   type AsyncFacingMode = 'user' | 'environment';
 
@@ -28,16 +28,16 @@ export default function MLIDCamera({ mode, onCapture, onClose, t }: MLIDCameraPr
 
   useEffect(() => {
     const intervals = [
-      'Google ML Kit AI 분석 대기 중...',
+      'AI 화질 분석 대기 중...',
       '실시간 에지(Edge) 검출 센서 동기화 중...',
       '빛반사(Glare) 및 조도 실시간 추적 중...',
       '초점 정합성 및 흐릿함(Blur) 계수 분석 중...',
-      'ML Kit 신원 검증 엔진 활성화 완료'
+      '얼굴 인증 엔진 활성화 완료'
     ];
     let idx = 0;
     const timer = setInterval(() => {
       idx = (idx + 1) % intervals.length;
-      setAnalyzingText(intervals[idx]);
+      setAnalyzingText(intervals[idx]!);
     }, 2000);
     return () => clearInterval(timer);
   }, []);
@@ -119,12 +119,12 @@ export default function MLIDCamera({ mode, onCapture, onClose, t }: MLIDCameraPr
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between overflow-hidden animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[100] bg-black flex flex-col justify-between overflow-hidden animate-in fade-in duration-300">
       {/* Header Overlay */}
       <div className="absolute top-0 inset-x-0 p-5 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-between z-30">
         <span className="text-xs font-black uppercase tracking-[0.2em] text-blue-400 flex items-center gap-1.5">
           <Sparkles className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
-          ML Kit Live Capture
+          AI Live Capture
         </span>
         <button 
           onClick={() => {

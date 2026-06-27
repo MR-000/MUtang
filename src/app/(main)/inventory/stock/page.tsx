@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { bffGet, bffPost } from '@/lib/bff-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -39,12 +39,7 @@ export default function StockListPage() {
   const fetchItems = async () => {
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from('inventory')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('name', { ascending: true });
-
+      const data = await bffGet<InventoryItem[]>('/api/bff/inventory');
       setItems(data || []);
     } finally {
       setLoading(false);
@@ -67,33 +62,24 @@ export default function StockListPage() {
     if (!editSku || !editName || !editPrice) return;
     setSaving(true);
     try {
-      // 바코드 중복 체크 (자기 자신 제외)
-      const { data: existing } = await supabase
-        .from('inventory')
-        .select('id')
-        .eq('user_id', user?.id)
-        .eq('sku', editSku)
-        .neq('id', id)
-        .maybeSingle();
+      const { exists } = await bffGet<{ exists: boolean }>(
+        `/api/bff/inventory?mode=check_sku&barcode=${encodeURIComponent(editSku)}&exclude_id=${id}`
+      );
 
-      if (existing) {
+      if (exists) {
         toast.error(t('duplicate_barcode_edit'));
         setSaving(false);
         return;
       }
 
-      const { error } = await supabase
-        .from('inventory')
-        .update({
-          sku: editSku,
-          name: editName,
-          price: parseFloat(editPrice),
-          stock: parseInt(editStock) || 0
-        })
-        .eq('id', id)
-        .eq('user_id', user?.id);
-
-      if (error) throw error;
+      await bffPost('/api/bff/inventory', {
+        action: 'update',
+        id,
+        sku: editSku,
+        name: editName,
+        price: parseFloat(editPrice),
+        stock: parseInt(editStock) || 0,
+      });
 
       toast.success(t('stock_updated'));
       setEditingId(null);

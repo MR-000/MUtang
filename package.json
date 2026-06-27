@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently -n opencode,ocr,next -c yellow,cyan,green \"opencode serve --port 4096\" \"python ocr-server/main.py\" \"next dev\"",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
-    "@base-ui/react": "^1.4.1",
+    "@base-ui/react": "1.4.1",
     "@capacitor-mlkit/barcode-scanning": "^6.0.0",
     "@capacitor/core": "^6.0.0",
     "@fontsource-variable/geist": "^5.1.0",
@@ -17,6 +17,8 @@
     "@pdf-lib/fontkit": "^1.1.1",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.105.4",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.0",
     "@zxing/library": "^0.23.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -32,7 +34,6 @@
     "react-hook-form": "^7.75.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
-    "tesseract.js": "^7.0.0",
     "tw-animate-css": "^1.2.0",
     "zod": "^4.4.3"
   },
@@ -41,6 +42,7 @@
     "@types/node": "^22.14.0",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
+    "concurrently": "^10.0.3",
     "eslint": "^9.0.0",
     "eslint-config-next": "15.5.18",
     "postcss": "^8.4.31",

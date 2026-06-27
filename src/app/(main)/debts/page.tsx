@@ -33,6 +33,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { bffGet, bffPost } from '@/lib/bff-client';
 import { useAuth } from '@/contexts/AuthContext';
 import { translations } from '@/lib/i18n';
 import { toast } from 'sonner';
@@ -101,8 +102,8 @@ const getSmartTranslatedText = (text: string | null | undefined, t: any): string
   
   const prefixMatch = text.match(/^(\[[^\]]+\])\s*(.*)$/);
   if (prefixMatch) {
-    prefix = prefixMatch[1];
-    mainBody = prefixMatch[2];
+    prefix = prefixMatch[1]!;
+    mainBody = prefixMatch[2]!;
     
     let prefixContent = prefix.slice(1, -1);
     
@@ -484,35 +485,9 @@ export default function Transactions() {
       // 'borrower' tab shows requests (posted by borrowers, lender_id is null)
       // 'lender' tab shows offers (posted by lenders, borrower_id is null)
       
-      let query;
-      const todayStr = new Date().toISOString().split('T')[0];
+      const marketData = await bffGet<{ borrowerPosts: any[]; lenderPosts: any[] }>('/api/bff/marketplace');
+      const data = matchingType === 'borrower' ? marketData.borrowerPosts : marketData.lenderPosts;
 
-      if (matchingType === 'borrower') {
-        query = supabase
-          .from('matching_requests')
-          .select(`
-            *,
-            poster_profile:profiles!matching_requests_borrower_id_fkey(full_name, trust_tier, trust_score, is_verified)
-          `)
-          .eq('status', 'pending')
-          .is('lender_id', null);
-      } else {
-        query = supabase
-          .from('matching_requests')
-          .select(`
-            *,
-            poster_profile:profiles!matching_requests_lender_id_fkey(full_name, trust_tier, trust_score, is_verified)
-          `)
-          .eq('status', 'pending')
-          .is('borrower_id', null);
-      }
-
-      // 만기일이 오늘 이후이거나 아예 지정되지 않은(null) 공고들만 출력
-      query = query.or(`due_date.gte.${todayStr},due_date.is.null`);
-
-      const { data, error } = await query.order('created_at', { ascending: false });
-
-      if (error) throw error;
       setRequests(data || []);
       if (data && typeof window !== 'undefined') {
         localStorage.setItem(`utang_cache_marketplace_${matchingType}`, JSON.stringify(data));
@@ -578,7 +553,7 @@ export default function Transactions() {
     let cleanDesc = req.description || '';
     const prefixMatch = cleanDesc.match(/^(\[[^\]]+\])\s*(.*)$/);
     if (prefixMatch) {
-      cleanDesc = prefixMatch[2];
+      cleanDesc = prefixMatch[2] ?? '';
     }
     setDescription(cleanDesc);
 
@@ -629,12 +604,7 @@ export default function Transactions() {
       // Optimistic UI Update: 서버 응답 지연을 방지하기 위해 로컬 state에서 즉시 제거
       setRequests(prev => prev.filter(r => r.id !== postToDeleteId));
       
-      const { error } = await supabase
-        .from('matching_requests')
-        .delete()
-        .eq('id', postToDeleteId);
-
-      if (error) throw error;
+      await bffPost('/api/bff/marketplace', { action: 'delete', id: postToDeleteId });
       
       toast.success(t('toast_post_deleted') || '공고가 성공적으로 삭제되었습니다.');
       // 백그라운드 서버 데이터 최종 재동기화
@@ -710,7 +680,7 @@ export default function Transactions() {
         let isOverdueViolated = false;
         let match;
         while ((match = overdueRegex.exec(overduePolicy || '')) !== null) {
-          const val = parseFloat(match[1]);
+          const val = parseFloat(match[1]!);
           if (val > 6) {
             isOverdueViolated = true;
             break;
@@ -725,7 +695,7 @@ export default function Transactions() {
       
       const isBorrower = matchingType === 'borrower';
       
-      let calculatedDueDate: string | null = null;
+      let calculatedDueDate = null as string | null;
       let durationText = '';
 
       // period 방식에 따른 다국어 텍스트 처리
@@ -749,7 +719,7 @@ export default function Transactions() {
         // 오늘 기준으로 일수 더하기
         const targetDate = new Date();
         targetDate.setDate(targetDate.getDate() + daysToAdd);
-        calculatedDueDate = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD 포맷
+        calculatedDueDate = targetDate.toISOString().split('T')[0] ?? null; // YYYY-MM-DD 포맷
       }
 
       // 설명 문구에 기일 정보 및 조정 가능 옵션을 접두어로 조립 (다국어화 반영)
@@ -773,41 +743,30 @@ export default function Transactions() {
       
       finalDescription = badgePrefix + finalDescription;
 
-      let queryExec;
-
       if (isEditMode && editingPostId) {
-        queryExec = supabase
-          .from('matching_requests')
-          .update({
-            amount: parsedAmount,
-            interest_rate: parsedInterest,
-            description: finalDescription || null,
-            due_date: calculatedDueDate,
-            overdue_policy: overduePolicy || null,
-            type: matchingType
-          })
-          .eq('id', editingPostId)
-          .select();
+        await bffPost('/api/bff/marketplace', {
+          action: 'update',
+          id: editingPostId,
+          amount: parsedAmount,
+          interest_rate: parsedInterest,
+          description: finalDescription || null,
+          due_date: calculatedDueDate,
+          overdue_policy: overduePolicy || null,
+          type: matchingType,
+        });
       } else {
-        queryExec = supabase
-          .from('matching_requests')
-          .insert([{
-            amount: parsedAmount,
-            interest_rate: parsedInterest,
-            description: finalDescription || null,
-            due_date: calculatedDueDate,
-            overdue_policy: overduePolicy || null,
-            status: 'pending',
-            type: matchingType,
-            borrower_id: isBorrower ? user?.id : null,
-            lender_id: !isBorrower ? user?.id : null
-          }])
-          .select();
+        await bffPost('/api/bff/marketplace', {
+          action: 'create',
+          amount: parsedAmount,
+          interest_rate: parsedInterest,
+          description: finalDescription || null,
+          due_date: calculatedDueDate,
+          overdue_policy: overduePolicy || null,
+          type: matchingType,
+          borrower_id: isBorrower ? user?.id : null,
+          lender_id: !isBorrower ? user?.id : null,
+        });
       }
-
-      const { data, error } = await queryExec;
-
-      if (error) throw error;
 
       toast.success(isEditMode ? (t('toast_post_updated') || '공고가 성공적으로 수정되었습니다.') : t('toast_post_registered'));
       setIsPostModalOpen(false);
@@ -845,6 +804,18 @@ export default function Transactions() {
     
     setIsSubmitting(true);
     setIsUploadingPhotos(true);
+
+    // 0. Platform fee credit deduction (atomic RPC)
+    const transactionFee = parseFloat(amount) * feeRate;
+    const currentCredit = profile?.credit ? parseFloat(profile.credit.toString()) : 0;
+    if (currentCredit < transactionFee) {
+      toast.error(t('credit_deduction_insufficient'));
+      setIsSubmitting(false);
+      setIsUploadingPhotos(false);
+      return;
+    }
+    await bffPost('/api/bff/credit', { action: 'deduct', user_id: user?.id, amount: transactionFee, loan_id: null });
+
     try {
       // 1. Upload ID Photos (사전 즉시 업로드된 이미지 URL 참조)
       const uploadedUrls: Record<string, string> = {};
@@ -856,47 +827,37 @@ export default function Transactions() {
       setIsUploadingPhotos(false);
 
       // 2. Update matching request status
-      await supabase
-        .from('matching_requests')
-        .update({ status: 'completed' })
-        .eq('id', selectedRequest?.id);
+      await bffPost('/api/bff/marketplace', { action: 'complete', id: selectedRequest?.id });
 
       // 3. Create actual loan record
-      const calcRepayAmount = parseFloat(amount) * (1 + parseFloat(interestRate || '0') / 100);
-      const extendedDescription = `${description || t('matching_marketplace')} (이율: ${interestRate}%, 연체규정: ${overduePolicy})`;
-      
-      const { data, error } = await supabase
-        .from('loans')
-        .insert([{
-          lender_id: isUserLender ? user?.id : selectedRequest?.lender_id,
-          borrower_id: isUserLender ? selectedRequest?.borrower_id : user?.id,
-          amount: parseFloat(amount),
-          repay_amount: calcRepayAmount,
-          description: extendedDescription,
-          due_date: dueDate || null,
-          status: 'pending_signature',
-          signature_data: JSON.stringify({
-            lender: isUserLender ? lenderSignature : null,
-            borrower: !isUserLender ? borrowerSignature : null
-          }),
-          verification_evidence: { 
-            timestamp: new Date().toISOString(),
-            method: 'Mobile Identity Capture',
-            id_count: 2,
-            photos_captured: Object.keys(uploadedUrls).length,
-            photos: {
-              lender: isUserLender ? uploadedUrls : null,
-              borrower: !isUserLender ? uploadedUrls : null
-            },
-            interest_rate: parseFloat(interestRate || '0'),
-            overdue_policy: overduePolicy,
-            fee_payer_id: user?.id
-          }
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
+      await bffPost('/api/bff/loans', {
+        action: 'create',
+        lender_id: isUserLender ? user?.id : selectedRequest?.lender_id,
+        borrower_id: isUserLender ? selectedRequest?.borrower_id : user?.id,
+        amount: parseFloat(amount),
+        repay_amount: parseFloat(amount) * (1 + parseFloat(interestRate || '0') / 100),
+        description: `${description || t('matching_marketplace')} (이율: ${interestRate}%, 연체규정: ${overduePolicy})`,
+        due_date: dueDate || null,
+        signature_data: JSON.stringify({
+          lender: isUserLender ? lenderSignature : null,
+          borrower: !isUserLender ? borrowerSignature : null
+        }),
+        verification_evidence: { 
+          timestamp: new Date().toISOString(),
+          method: 'Mobile Identity Capture',
+          id_count: 2,
+          photos_captured: Object.keys(uploadedUrls).length,
+          photos: {
+            lender: isUserLender ? uploadedUrls : null,
+            borrower: !isUserLender ? uploadedUrls : null
+          },
+          interest_rate: parseFloat(interestRate || '0'),
+          overdue_policy: overduePolicy,
+          fee_payer_id: user?.id,
+          fee_deducted_at: new Date().toISOString(),
+          platform_fee: transactionFee
+        },
+      });
       
       toast.success(t('post_created') + ' (상대방 서약 대기 상태)');
       setIsTransactionOpen(false);
@@ -997,22 +958,18 @@ export default function Transactions() {
         existingEvidence.photos.borrower = uploadedUrls;
       }
 
-      // 최종 거래 성사를 위해 status를 waiting_transfer로 전환
-      const { error } = await supabase
-        .from('loans')
-        .update({
-          status: 'waiting_transfer',
-          signature_data: JSON.stringify(existingSigs),
-          verification_evidence: {
-            ...existingEvidence,
-            timestamp: new Date().toISOString(),
-            id_count: 4, // 양자 모두 제출 완료되었으므로 최종 ID 스캔 수는 4개
-            photos_captured: (existingEvidence.photos.lender ? Object.keys(existingEvidence.photos.lender).length : 0) + Object.keys(uploadedUrls).length
-          }
-        })
-        .eq('id', partnerSignLoan.id);
-
-      if (error) throw error;
+      await bffPost('/api/bff/loans', {
+        action: 'update_status',
+        loan_id: partnerSignLoan.id,
+        status: 'waiting_transfer',
+        signature_data: JSON.stringify(existingSigs),
+        verification_evidence: {
+          ...existingEvidence,
+          timestamp: new Date().toISOString(),
+          id_count: 4,
+          photos_captured: (existingEvidence.photos.lender ? Object.keys(existingEvidence.photos.lender).length : 0) + Object.keys(uploadedUrls).length
+        },
+      });
 
       toast.success('거래 서약 완료! 이제 채권자 송금 대기 상태로 전환되었습니다.');
       setIsPartnerSignOpen(false);
@@ -1039,15 +996,12 @@ export default function Transactions() {
       }
       evidence.transferred_at = new Date().toISOString();
 
-      const { error } = await supabase
-        .from('loans')
-        .update({
-          status: 'waiting_receipt',
-          verification_evidence: evidence
-        })
-        .eq('id', loan.id);
-
-      if (error) throw error;
+      await bffPost('/api/bff/loans', {
+        action: 'update_status',
+        loan_id: loan.id,
+        status: 'waiting_receipt',
+        verification_evidence: evidence,
+      });
       toast.success(t('transfer_completed_label') || '송금 완료 처리되었습니다.');
       fetchLoans();
     } catch (err: any) {
@@ -1073,33 +1027,14 @@ export default function Transactions() {
       const feePayerId = evidence.fee_payer_id || loan.lender_id;
       const transactionFee = parseFloat(loan.amount) * feeRate;
 
-      const { data: profileData, error: profileErr } = await supabase
-        .from('profiles')
-        .select('credit')
-        .eq('id', feePayerId)
-        .single();
+      await bffPost('/api/bff/credit', { action: 'update', user_id: feePayerId, amount: transactionFee });
 
-      if (profileErr) throw profileErr;
-
-      const currentCredit = profileData?.credit ? parseFloat(profileData.credit.toString()) : 0;
-      const newCredit = Math.max(0, currentCredit - transactionFee);
-
-      const { error: creditError } = await supabase
-        .from('profiles')
-        .update({ credit: newCredit })
-        .eq('id', feePayerId);
-
-      if (creditError) throw creditError;
-
-      const { error } = await supabase
-        .from('loans')
-        .update({
-          status: 'pending',
-          verification_evidence: evidence
-        })
-        .eq('id', loan.id);
-
-      if (error) throw error;
+      await bffPost('/api/bff/loans', {
+        action: 'update_status',
+        loan_id: loan.id,
+        status: 'pending',
+        verification_evidence: evidence,
+      });
       toast.success(t('receipt_completed_label') || '수령 및 계약 최종 성사 완료!');
       fetchLoans();
     } catch (err: any) {
@@ -1113,18 +1048,7 @@ export default function Transactions() {
   const fetchLoans = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('loans')
-        .select(`
-          *,
-          lender:profiles!loans_lender_id_fkey(full_name, phone, gcash_qr_url, gcash_number, solana_wallet),
-          borrower:profiles!loans_borrower_id_fkey(full_name),
-          payment_proofs(*)
-        `)
-        .or(`lender_id.eq.${user?.id},borrower_id.eq.${user?.id}`)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const data = await bffGet<any[]>('/api/bff/loans');
       setDebts(data || []);
       if (data && typeof window !== 'undefined') {
         localStorage.setItem('utang_cache_debts', JSON.stringify(data));
@@ -1149,11 +1073,7 @@ export default function Transactions() {
 
   const fetchFeeRate = async () => {
     try {
-      const { data, error } = await supabase
-        .from('system_settings')
-        .select('value')
-        .eq('key', 'credit_fee_rate')
-        .single();
+      const data = await bffGet<any>('/api/bff/settings?key=credit_fee_rate');
       if (data && data.value) {
         setFeeRate(parseFloat(data.value));
       }
@@ -1186,15 +1106,7 @@ export default function Transactions() {
       if (requestIdParam) {
         const fetchAndStart = async () => {
           try {
-            const { data, error } = await supabase
-              .from('matching_requests')
-              .select(`
-                *,
-                poster_profile:profiles!matching_requests_borrower_id_fkey(full_name, trust_tier, trust_score, is_verified)
-              `)
-              .eq('id', requestIdParam)
-              .single();
-            if (error) throw error;
+            const data = await bffGet<any>(`/api/bff/marketplace?id=${requestIdParam}`);
             if (data) {
               handleStartTransaction(data);
             }
@@ -1278,36 +1190,23 @@ export default function Transactions() {
         .from('payment-proofs')
         .getPublicUrl(filePath);
 
-      // 3. Insert row to payment_proofs
-      const { error: dbError } = await supabase
-        .from('payment_proofs')
-        .insert([{
-          loan_id: payingLoan.id,
-          submitter_id: user.id,
-          screenshot_url: publicUrl,
-          gcash_reference: paymentMethod === 'gcash' ? gcashReference.trim() : `Coin: ${coinType.toUpperCase()}`,
-          amount_claimed: parseFloat(amountClaimed),
-          deposited_at: new Date(depositedAt).toISOString(),
-          status: 'submitted',
-          auto_confirm_deadline: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-          payment_method: paymentMethod,
-          wallet_address: paymentMethod === 'coin' ? walletAddress.trim() : null
-        }]);
-
-      if (dbError) {
-        throw dbError;
-      }
-
-      // 4. Send real-time notification
       const methodLabel = paymentMethod === 'gcash' ? 'GCash' : `${coinType.toUpperCase()} ${t('coin_label')}`;
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: payingLoan.lender_id,
-          title: t('toast_repay_notification_title'),
-          message: t('toast_repay_notification_msg').replace('{name}', profile?.full_name || t('borrower_label')).replace('{method}', methodLabel).replace('{amount}', Number(amountClaimed).toLocaleString()),
-          type: 'payment'
-        });
+
+      await bffPost('/api/bff/payment-proofs', {
+        loan_id: payingLoan.id,
+        screenshot_url: publicUrl,
+        gcash_reference: paymentMethod === 'gcash' ? gcashReference.trim() : `Coin: ${coinType.toUpperCase()}`,
+        amount_claimed: parseFloat(amountClaimed),
+        payment_method: paymentMethod,
+        wallet_address: paymentMethod === 'coin' ? walletAddress.trim() : null,
+      });
+
+      await bffPost('/api/bff/notifications', {
+        user_id: payingLoan.lender_id,
+        title: t('toast_repay_notification_title'),
+        message: t('toast_repay_notification_msg').replace('{name}', profile?.full_name || t('borrower_label')).replace('{method}', methodLabel).replace('{amount}', Number(amountClaimed).toLocaleString()),
+        type: 'payment'
+      });
 
       toast.success(t('toast_repay_submitted'));
       setIsPaymentOpen(false);
@@ -2118,6 +2017,7 @@ export default function Transactions() {
                   <div className="space-y-3">
                     <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('overdue_policy_label')}</Label>
                     <Select value={policyType} onValueChange={(value) => {
+                      if (value === null) return;
                       setPolicyType(value);
                       if (value !== 'custom') {
                         setOverduePolicy(value);
@@ -2231,8 +2131,8 @@ export default function Transactions() {
                         }}
                         className="aspect-[4/3] bg-slate-50 dark:bg-white/5 rounded-[32px] border-2 border-dashed border-slate-200 dark:border-white/10 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 transition-all relative overflow-hidden group"
                       >
-                        {idPhotos[p.id].preview ? (
-                          <img src={idPhotos[p.id].preview!} alt={p.label} className="w-full h-full object-cover" />
+                        {idPhotos[p.id]?.preview ? (
+                          <img src={idPhotos[p.id]?.preview ?? ''} alt={p.label} className="w-full h-full object-cover" />
                         ) : (
                           <>
                             <div className="w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -2346,10 +2246,10 @@ export default function Transactions() {
                 <Button 
                   onClick={() => {
                     if (txStep === 2 && !isSelfAdminTx) {
-                      const front1Captured = !!idPhotos.front1.preview;
-                      const back1Captured = !!idPhotos.back1.preview;
-                      const front2Captured = !!idPhotos.front2.preview;
-                      const back2Captured = !!idPhotos.back2.preview;
+                      const front1Captured = !!idPhotos.front1?.preview;
+                      const back1Captured = !!idPhotos.back1?.preview;
+                      const front2Captured = !!idPhotos.front2?.preview;
+                      const back2Captured = !!idPhotos.back2?.preview;
                       const selfieCaptured = !!idPhotos.selfie?.preview;
                       
                       if (!front1Captured || !back1Captured || !front2Captured || !back2Captured || !selfieCaptured) {
@@ -2580,6 +2480,7 @@ export default function Transactions() {
               <div className="space-y-3">
                 <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('overdue_policy_label')}</Label>
                 <Select value={policyType} onValueChange={(value) => {
+                  if (value === null) return;
                   setPolicyType(value);
                   if (value !== 'custom') {
                     setOverduePolicy(value);
@@ -2613,7 +2514,7 @@ export default function Transactions() {
                       let isViolated = false;
                       let match;
                       while ((match = regex.exec(customPolicy)) !== null) {
-                        const value = parseFloat(match[1]);
+                        const value = parseFloat(match[1]!);
                         if (value > 6) {
                           isViolated = true;
                           break;
@@ -2667,7 +2568,7 @@ export default function Transactions() {
                 <div className="space-y-4 animate-in fade-in duration-300">
                   <div className="space-y-3">
                     <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 px-1">{t('due_date_period_select') || t('due_date_adjustable_placeholder')}</Label>
-                    <Select value={periodValue} onValueChange={setPeriodValue}>
+                    <Select value={periodValue} onValueChange={(value) => { if (value !== null) setPeriodValue(value); }}>
                       <SelectTrigger className="h-16 rounded-2xl bg-slate-50 dark:bg-white/5 border-none font-bold focus:ring-2 focus:ring-blue-500">
                         <SelectValue placeholder={t('due_date_adjustable_placeholder')} />
                       </SelectTrigger>
@@ -3131,8 +3032,8 @@ export default function Transactions() {
                         }}
                         className="aspect-[4/3] bg-slate-50 dark:bg-white/5 rounded-[32px] border-2 border-dashed border-slate-200 dark:border-white/10 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 transition-all relative overflow-hidden group"
                       >
-                        {idPhotos[p.id].preview ? (
-                          <img src={idPhotos[p.id].preview!} alt={p.label} className="w-full h-full object-cover" />
+                        {idPhotos[p.id]?.preview ? (
+                          <img src={idPhotos[p.id]?.preview ?? ''} alt={p.label} className="w-full h-full object-cover" />
                         ) : (
                           <>
                             <div className="w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">

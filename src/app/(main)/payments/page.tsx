@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { CreditCard, Receipt } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { bffGet } from '@/lib/bff-client';
 import { format } from 'date-fns';
 
 interface Payment {
@@ -30,18 +30,7 @@ export default function Payments() {
 
   const fetchPayments = async () => {
     try {
-      const { data, error } = await supabase
-        .from('payments')
-        .select(`
-          *,
-          debts (
-            customers (name)
-          )
-        `)
-        .eq('user_id', user?.id)
-        .order('paid_at', { ascending: false });
-
-      if (error) throw error;
+      const data = await bffGet<Payment[]>('/api/bff/payments');
       setPayments(data || []);
     } catch (error: any) {
       console.error('Error fetching payments:', error);

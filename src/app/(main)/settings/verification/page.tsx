@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { bffPatch } from '@/lib/bff-client';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -64,6 +65,20 @@ export default function VerificationPage() {
   }, []);
 
   const processCapturedPhoto = async (file: File) => {
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error('파일 크기가 너무 큽니다. 10MB 이하로 촬영해 주세요.');
+      setLoading(false);
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('지원하지 않는 이미지 형식입니다.');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       // 1. 이미지 압축
@@ -91,7 +106,7 @@ export default function VerificationPage() {
             
           if (!listError && fileList) {
             const filesToDelete = fileList
-              .filter(file => file.name.startsWith(currentStepName))
+              .filter(file => file.name.startsWith(currentStepName ?? ''))
               .map(file => `${user.id}/${file.name}`);
               
             if (filesToDelete.length > 0) {
@@ -147,36 +162,52 @@ export default function VerificationPage() {
         throw new Error('선택하신 신분증 유효기간이 이미 만료되었습니다. 사용 가능한 신분증으로 촬영해 주세요.');
       }
 
-      // 2. AI OCR 글자 인식 비교 (PaddleOCR 시뮬레이션 매칭)
-      // 실제 서비스에서는 OCR 이미지 데이터에서 날짜 문자열을 파싱합니다.
-      // 시뮬레이션으로 수동 입력값과 OCR 예측 값이 차이날 때 매칭 에러 처리
-      const simulatedOCRDate = '2032-12-31'; // AI가 신분증 사진에서 정상 검출한 예시 날짜
-      // 예: 사진상 날짜와 수동 기입 날짜의 차이가 너무 크면 위변조 경고
-      const ocrTime = new Date(simulatedOCRDate).getTime();
-      const userEnteredTime = enteredExpiry.getTime();
-      const diffDays = Math.abs(ocrTime - userEnteredTime) / (1000 * 60 * 60 * 24);
-      
-      // 실제 유효기간 비교 및 경고 (수동 기입한 날짜가 실제 검수용 AI 판독값과 차이가 큰 경우)
-      if (diffDays > 365) {
-        throw new Error('입력하신 유효기간이 촬영된 신분증 내 표기된 만료일과 일치하지 않습니다. 신분증 글씨가 선명하도록 다시 촬영하거나 날짜를 확인해 주세요.');
+      // 2. 신분증-셀피 동일인물 AI 대조
+      // ID2 뒷면(photos[3])과 셀피(photos[4])를 비교
+      if (verificationData.photos.length >= 5) {
+        const idPhotoPath = verificationData.photos[3]!.path;
+        const selfiePath = verificationData.photos[4]!.path;
+
+        const { data: idUrl } = supabase.storage.from('user-ids').getPublicUrl(idPhotoPath);
+        const { data: selfieUrl } = supabase.storage.from('user-ids').getPublicUrl(selfiePath);
+
+        try {
+          const token = (await supabase.auth.getSession()).data.session?.access_token;
+          const faceRes = await fetch('/api/face-compare', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              idImageUrl: idUrl.publicUrl,
+              selfieImageUrl: selfieUrl.publicUrl,
+            }),
+          });
+
+          const faceResult = await faceRes.json();
+          console.log('[Face Compare] Result:', faceResult);
+
+          if (faceResult.success && faceResult.match === false && faceResult.confidence !== null) {
+            toast.warning(
+              `신분증 사진과 셀피가 동일 인물일 가능성이 낮습니다 (신뢰도: ${(faceResult.confidence * 100).toFixed(0)}%). 수동 검토가 필요합니다.`,
+              { duration: 8000 }
+            );
+          }
+        } catch (faceErr) {
+          console.warn('[Face Compare] Skipped due to error:', faceErr);
+        }
       }
 
-      // 3. Profiles 테이블에 신분증 사진 경로 및 유효기간 만료일 저장
-      const { error: profileUpdateErr } = await supabase
-        .from('profiles')
-        .update({
-          id_front_url: paths[0],
-          id_back_url: paths[1],
-          id_front_url_2: paths[2],
-          id_back_url_2: paths[3],
-          selfie_url: paths[4],
-          id_expiry: verificationData.expiryDate, // 수동 입력 및 인증 필터 통과한 만료일 저장
-          verification_status: 'pending',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user!.id);
-
-      if (profileUpdateErr) throw profileUpdateErr;
+      await bffPatch('/api/bff/me', {
+        id_front_url: paths[0],
+        id_back_url: paths[1],
+        id_front_url_2: paths[2],
+        id_back_url_2: paths[3],
+        selfie_url: paths[4],
+        id_expiry: verificationData.expiryDate,
+        verification_status: 'pending',
+      });
 
       toast.success(t('verified') || '신분증 및 셀피 인증 서류가 정상 제출되었습니다!');
       await refreshProfile();

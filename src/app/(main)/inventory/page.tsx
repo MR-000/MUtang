@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { bffGet } from '@/lib/bff-client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
@@ -55,36 +55,22 @@ export default function InventoryDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch total products count
-      const { count: productsCount } = await supabase
-        .from('inventory')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user?.id);
-        
-      setTotalProducts(productsCount || 0);
+      const [inventoryData, salesLogs] = await Promise.all([
+        bffGet<any[]>('/api/bff/inventory'),
+        bffGet<LedgerLog[]>('/api/bff/inventory-logs?range=day&type=sale'),
+      ]);
 
-      // Fetch today's sales from logs
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
+      setTotalProducts(inventoryData?.length || 0);
 
-      const { data: logs } = await supabase
-        .from('inventory_logs')
-        .select('quantity_change, price')
-        .eq('user_id', user?.id)
-        .eq('type', 'sale')
-        .gte('created_at', startOfDay.toISOString());
-
-      if (logs) {
-        let salesCount = 0;
-        let revenue = 0;
-        logs.forEach(log => {
-          const qty = Math.abs(log.quantity_change);
-          salesCount += qty;
-          revenue += qty * log.price;
-        });
-        setTodaySales(salesCount);
-        setTodayRevenue(revenue);
-      }
+      let salesCount = 0;
+      let revenue = 0;
+      (salesLogs || []).forEach(log => {
+        const qty = Math.abs(log.quantity_change);
+        salesCount += qty;
+        revenue += qty * log.price;
+      });
+      setTodaySales(salesCount);
+      setTodayRevenue(revenue);
     } catch (e) {
       console.error(e);
     } finally {
@@ -95,10 +81,7 @@ export default function InventoryDashboard() {
   const fetchAllProducts = async () => {
     if (!user) return;
     try {
-      const { data } = await supabase
-        .from('inventory')
-        .select('sku, name')
-        .eq('user_id', user.id);
+      const data = await bffGet<any[]>('/api/bff/inventory?mode=names');
       setProducts(data || []);
     } catch (e) {
       console.error(e);
@@ -109,25 +92,8 @@ export default function InventoryDashboard() {
     if (!user) return;
     setLedgerLoading(true);
     try {
-      const startDate = new Date();
-      if (range === 'day') {
-        startDate.setHours(0, 0, 0, 0);
-      } else {
-        startDate.setDate(startDate.getDate() - 30);
-        startDate.setHours(0, 0, 0, 0);
-      }
-
-      // 오직 매출(type: 'sale') 데이터만 쿼리해와 속도 및 보안 극대화
-      const { data, error } = await supabase
-        .from('inventory_logs')
-        .select('*')
-        .eq('user_id', user?.id)
-        .eq('type', 'sale')
-        .gte('created_at', startDate.toISOString())
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setLedgerLogs(data as any || []);
+      const data = await bffGet<LedgerLog[]>(`/api/bff/inventory-logs?range=${range}&type=sale`);
+      setLedgerLogs(data || []);
     } catch (e: any) {
       toast.error(e.message || '장부 로딩 실패');
     } finally {

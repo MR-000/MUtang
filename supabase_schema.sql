@@ -64,6 +64,41 @@ WITH CHECK (
   )
 );
 
+-- Credit CHECK constraint
+ALTER TABLE public.profiles ADD CONSTRAINT credit_non_negative CHECK (credit >= 0);
+
+-- Atomic Credit Deduction RPC (with row-level lock)
+CREATE OR REPLACE FUNCTION public.deduct_credit(
+  p_user_id UUID,
+  p_amount NUMERIC,
+  p_loan_id UUID DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_current_credit NUMERIC;
+BEGIN
+  SELECT credit INTO v_current_credit
+  FROM public.profiles
+  WHERE id = p_user_id
+  FOR UPDATE;
+
+  IF v_current_credit IS NULL OR v_current_credit < p_amount THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Insufficient credit balance');
+  END IF;
+
+  UPDATE public.profiles
+  SET credit = credit - p_amount
+  WHERE id = p_user_id;
+
+  RETURN jsonb_build_object('success', true, 'deducted', p_amount, 'remaining', v_current_credit - p_amount);
+EXCEPTION WHEN OTHERS THEN
+  RETURN jsonb_build_object('success', false, 'error', SQLERRM);
+END;
+$$;
+
 -- 4. Push Subscriptions for PWA
 CREATE TABLE push_subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -113,7 +148,7 @@ CREATE TABLE IF NOT EXISTS public.payment_proofs (
 
 -- RLS Enable & Policies
 ALTER TABLE public.payment_proofs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users involved in loan can view proofs" ON public.payment_proofs FOR SELECT USING (true);
+CREATE POLICY "Users involved in loan can view proofs" ON public.payment_proofs FOR SELECT USING (auth.uid() = submitter_id);
 CREATE POLICY "Users can insert own proofs" ON public.payment_proofs FOR INSERT WITH CHECK (auth.uid() = submitter_id);
 
 -- 7. GCash 자동 충전 완료 RPC 함수 ( complete_gcash_deposit )

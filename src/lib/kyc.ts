@@ -91,9 +91,9 @@ export const checkImageQuality = (blob: Blob): Promise<{ success: boolean; messa
         
         // 1. 회색조(Grayscale) 변환 및 명도, 빛반사 픽셀 추출 (2픽셀 단위 샘플링으로 연산 부하 50% 절감)
         for (let i = 0; i < pixelCount; i += 2) {
-          const r = data[i * 4];
-          const g = data[i * 4 + 1];
-          const b = data[i * 4 + 2];
+          const r = data[i * 4]!;
+          const g = data[i * 4 + 1]!;
+          const b = data[i * 4 + 2]!;
           
           // 인간의 시각 인지 특성을 반영한 Luminance 공식 적용
           const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
@@ -115,9 +115,9 @@ export const checkImageQuality = (blob: Blob): Promise<{ success: boolean; messa
         for (let y = 1; y < height - 1; y += 3) {
           for (let x = 1; x < width - 1; x += 3) {
             const idx = y * width + x;
-            const val = gray[idx];
-            const diffX = Math.abs(val - gray[idx + 1]);
-            const diffY = Math.abs(val - gray[idx + width]);
+            const val = gray[idx]!;
+            const diffX = Math.abs(val - gray[idx + 1]!);
+            const diffY = Math.abs(val - gray[idx + width]!);
             edgeDeltaSum += diffX + diffY;
           }
         }
@@ -162,33 +162,22 @@ export const checkImageQuality = (blob: Blob): Promise<{ success: boolean; messa
 };
 
 /**
- * PaddleOCR 연동 (FastAPI)
+ * PaddleOCR + PP-StructureV3 연동 (FastAPI)
  */
 export const analyzeWithOCR = async (blob: Blob): Promise<KYCResult> => {
-  const fallbackData: KYCResult = {
-    success: true,
-    message: 'OCR Analysis Complete (Offline Fallback)',
-    data: {
-      full_name: 'JUAN DELA CRUZ',
-      id_number: '1234-5678-9012',
-      expiry_date: '2030-01-01'
-    }
-  };
-
   try {
     const formData = new FormData();
     formData.append('file', blob, 'id_capture.jpg');
 
     const ocrUrl = process.env.NEXT_PUBLIC_OCR_URL || 'http://localhost:8000/ocr';
-    
-    // 무료 API 응답 지연 및 오프라인 렌더링 대비를 위해 2.5초 타임아웃 컨트롤러 추가
+
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
-    
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
     const response = await fetch(ocrUrl, {
       method: 'POST',
       body: formData,
-      signal: controller.signal
+      signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
@@ -198,21 +187,104 @@ export const analyzeWithOCR = async (blob: Blob): Promise<KYCResult> => {
     }
 
     const resData = await response.json();
-    
+
+    const fullText = resData.text || '';
+    const lines = resData.lines || [];
+    const fullName = extractField(fullText, ['name', 'full name', 'surname', 'given names']);
+    const idNumber = extractField(fullText, ['id number', 'id no', 'identification', 'tin', 'sss', 'umid']);
+    const expiryDate = extractField(fullText, ['expiry', 'expiration', 'valid until', 'date of expiry']);
+
+    if (!fullName && !idNumber) {
+      return {
+        success: false,
+        message: 'OCR 결과에서 필요한 정보를 추출할 수 없습니다. 신분증이 선명하게 보이도록 다시 촬영해 주세요.',
+      };
+    }
+
     return {
       success: true,
-      message: 'OCR Analysis Complete (Live Match)',
+      message: `OCR Analysis Complete (${resData.ocr_engine || 'PP-OCRv6 Medium'})`,
       data: {
-        full_name: resData.full_name || fallbackData.data?.full_name,
-        id_number: resData.id_number || fallbackData.data?.id_number,
-        expiry_date: resData.expiry_date || fallbackData.data?.expiry_date
-      }
+        full_name: fullName || '',
+        id_number: idNumber || '',
+        expiry_date: expiryDate || '',
+      },
     };
   } catch (error: any) {
-    console.warn(`[OCR 무상 서버 우회 폴백] 무료 API 한도 초과 또는 오프라인 상태 감지로 무비용 세이프 데이터로 안전히 전향되었습니다. 에러:`, error.message);
-    return fallbackData;
+    console.error('[OCR] 서버 연결 실패:', error.message);
+    return {
+      success: false,
+      message: '신분증 인식 서버에 연결할 수 없습니다. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.',
+    };
   }
 };
+
+/**
+ * 문서 구조 분석 (PP-StructureV3)
+ */
+export const analyzeDocumentStructure = async (blob: Blob): Promise<{
+  success: boolean;
+  elements: { type: string; text: string }[];
+  message: string;
+}> => {
+  try {
+    const formData = new FormData();
+    formData.append('file', blob, 'document.jpg');
+
+    const url = process.env.NEXT_PUBLIC_OCR_URL
+      ? process.env.NEXT_PUBLIC_OCR_URL.replace('/ocr', '/structure')
+      : 'http://localhost:8000/structure';
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Structure Server HTTP error: ${response.status}`);
+    }
+
+    const resData = await response.json();
+
+    return {
+      success: true,
+      elements: (resData.elements || []).map((el: any) => ({
+        type: el.type || 'unknown',
+        text: el.text || '',
+      })),
+      message: `PP-StructureV3 분석 완료 (${resData.element_count || 0}개 요소)`,
+    };
+  } catch (error: any) {
+    console.error('[Structure] 서버 연결 실패:', error.message);
+    return {
+      success: false,
+      elements: [],
+      message: '문서 구조 분석 서버에 연결할 수 없습니다.',
+    };
+  }
+};
+
+function extractField(text: string, keywords: string[]): string {
+  const lines = text.split('\n');
+  for (const line of lines) {
+    const lower = line.toLowerCase().trim();
+    for (const kw of keywords) {
+      if (lower.includes(kw)) {
+        const after = line.substring(line.toLowerCase().indexOf(kw) + kw.length).trim();
+        if (after && after.length < 60) {
+          return after.replace(/^[:.\s\-]+/, '').trim();
+        }
+      }
+    }
+  }
+  return '';
+}
 
 /**
  * 최종 신분증 검수 및 프로필 업데이트 (셀피 이미지 포함)

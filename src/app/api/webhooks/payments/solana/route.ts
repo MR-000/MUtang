@@ -1,20 +1,48 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { convertTokenToCredit } from '@/lib/exchange';
+import crypto from 'crypto';
 
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const USDT_MINT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB";
 
+function verifyHeliusSignature(req: Request, body: string): boolean {
+  const signature = req.headers.get('x-webhook-signature');
+  const webhookId = req.headers.get('x-webhook-id');
+  const timestamp = req.headers.get('x-webhook-timestamp');
+  const secret = process.env.HELIUS_WEBHOOK_SECRET;
+
+  if (!secret) return true;
+  if (!signature || !webhookId || !timestamp) return false;
+
+  const payload = `${webhookId}.${timestamp}.${body}`;
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex');
+
+  const sigBuf = Buffer.from(signature);
+  const expectedBuf = Buffer.from(expectedSignature);
+  if (sigBuf.length !== expectedBuf.length) return false;
+  return crypto.timingSafeEqual(sigBuf, expectedBuf);
+}
+
 export async function POST(req: Request) {
   try {
-    const transactions = await req.json();
+    const body = await req.text();
+    
+    if (!verifyHeliusSignature(req, body)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const transactions = JSON.parse(body);
 
     if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
       return NextResponse.json({ message: "No data" }, { status: 200 });
     }
 
     for (const tx of transactions) {
-      if (tx.type !== "TOKEN_TRANSFER" || !tx.tokenTransfers) {
+      if (!tx.tokenTransfers || tx.tokenTransfers.length === 0) {
         continue;
       }
 

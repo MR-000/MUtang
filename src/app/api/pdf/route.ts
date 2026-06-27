@@ -75,9 +75,9 @@ async function embedBase64Image(pdfDoc: PDFDocument, base64Data: string) {
 
     if (base64Data.includes(',')) {
       const parts = base64Data.split(',');
-      base64Str = parts[1];
+      base64Str = parts[1] ?? '';
       const header = parts[0];
-      if (header.includes('image/jpeg') || header.includes('image/jpg')) {
+      if (header?.includes('image/jpeg') || header?.includes('image/jpg')) {
         isPng = false;
       }
     } else {
@@ -514,7 +514,7 @@ export async function POST(req: NextRequest) {
         if (embedImg) {
           page.drawRectangle({ x: xPos, y: yPos, width: cardWidth, height: cardHeight, borderColor: borderGray, borderWidth: 1 });
           page.drawImage(embedImg, { x: xPos + 10, y: yPos + 30, width: cardWidth - 20, height: cardHeight - 50 });
-          page.drawText(photoLabels[key], { x: xPos + 15, y: yPos + 12, size: 8, font, color: grayColor });
+          page.drawText(photoLabels[key] ?? '', { x: xPos + 15, y: yPos + 12, size: 8, font, color: grayColor });
 
           xPos += cardWidth + gap;
           if (xPos + cardWidth > 572) {

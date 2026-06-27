@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, User, Phone, Search } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { bffGet, bffPost } from '@/lib/bff-client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -38,13 +38,7 @@ export default function Customers() {
 
   const fetchCustomers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const data = await bffGet<Customer[]>('/api/bff/customers');
       setCustomers(data || []);
     } catch (error: any) {
       console.error('Error fetching customers:', error);
@@ -74,20 +68,12 @@ export default function Customers() {
     setIsSubmitting(true);
 
     try {
-      const { data, error } = await supabase
-        .from('customers')
-        .insert([{
-          user_id: user?.id,
-          name: optimisticCustomer.name,
-          phone: optimisticCustomer.phone,
-          notes: optimisticCustomer.notes
-        }])
-        .select()
-        .single();
+      const data = await bffPost<Customer>('/api/bff/customers', {
+        name: optimisticCustomer.name,
+        phone: optimisticCustomer.phone,
+        notes: optimisticCustomer.notes
+      });
 
-      if (error) throw error;
-      
-      // Replace optimistic customer with real data
       setCustomers(prev => prev.map(c => c.id === tempId ? data : c));
       toast.success(t('customer_added') || 'Customer added successfully');
     } catch (error: any) {
