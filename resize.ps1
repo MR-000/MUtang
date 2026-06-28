@@ -21,8 +21,14 @@ function Resize-Image {
     $srcImg.Dispose()
 }
 
+# 기존 퍼블릭 리사이징 유지
 Resize-Image -SourcePath "d:\MT\utang\DOC\android.png" -TargetPath "d:\MT\utang\public\android-192.png" -Width 192 -Height 192
 Resize-Image -SourcePath "d:\MT\utang\DOC\android.png" -TargetPath "d:\MT\utang\public\android-512.png" -Width 512 -Height 512
 Resize-Image -SourcePath "d:\MT\utang\DOC\IOS.png" -TargetPath "d:\MT\utang\public\apple-touch-icon.png" -Width 180 -Height 180
+
+# PWA 클라이언트용 아이콘 리사이징 추가
+Resize-Image -SourcePath "d:\MT\utang\DOC\android.png" -TargetPath "d:\MT\utang\pwa-client\public\pwa-192x192.png" -Width 192 -Height 192
+Resize-Image -SourcePath "d:\MT\utang\DOC\android.png" -TargetPath "d:\MT\utang\pwa-client\public\pwa-512x512.png" -Width 512 -Height 512
+Resize-Image -SourcePath "d:\MT\utang\DOC\IOS.png" -TargetPath "d:\MT\utang\pwa-client\public\apple-touch-icon.png" -Width 180 -Height 180
 
 Write-Host "Resizing complete!"

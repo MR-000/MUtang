@@ -13,7 +13,7 @@ export async function GET(req: Request) {
     if (id) {
       const { data, error } = await supabase!
         .from('matching_requests')
-        .select('id, lender_id, borrower_id, amount, interest_rate, status, type, created_at, description, due_date, overdue_policy, poster_profile:profiles!matching_requests_borrower_id_fkey(full_name, trust_tier, trust_score, is_verified)')
+        .select('id, lender_id, borrower_id, amount, interest_rate, status, type, created_at, description, due_date, overdue_policy, poster_profile:profiles!matching_requests_borrower_id_fkey(full_name, tier, trust_score, is_id_verified)')
         .eq('id', id)
         .single();
 
@@ -26,7 +26,7 @@ export async function GET(req: Request) {
     if (myPosts) {
       const { data, error } = await supabase!
         .from('matching_requests')
-        .select('id, lender_id, borrower_id, amount, interest_rate, status, type, created_at, description, due_date, overdue_policy, poster_profile:profiles!matching_requests_borrower_id_fkey(full_name, trust_tier, trust_score, is_verified)')
+        .select('id, lender_id, borrower_id, amount, interest_rate, status, type, created_at, description, due_date, overdue_policy, poster_profile:profiles!matching_requests_borrower_id_fkey(full_name, tier, trust_score, is_id_verified)')
         .eq('status', 'pending')
         .is('lender_id', null);
 
@@ -37,14 +37,14 @@ export async function GET(req: Request) {
     const [borrowerPosts, lenderPosts] = await Promise.all([
       supabase!
         .from('matching_requests')
-        .select('id, lender_id, borrower_id, amount, interest_rate, status, type, created_at, description, due_date, overdue_policy, poster_profile:profiles!matching_requests_borrower_id_fkey(full_name, trust_tier, trust_score, is_verified)')
+        .select('id, lender_id, borrower_id, amount, interest_rate, status, type, created_at, description, due_date, overdue_policy, poster_profile:profiles!matching_requests_borrower_id_fkey(full_name, tier, trust_score, is_id_verified)')
         .eq('status', 'pending')
         .is('lender_id', null)
         .or(`due_date.gte.${todayStr},due_date.is.null`)
         .order('created_at', { ascending: false }),
       supabase!
         .from('matching_requests')
-        .select('id, lender_id, borrower_id, amount, interest_rate, status, type, created_at, description, due_date, overdue_policy, poster_profile:profiles!matching_requests_lender_id_fkey(full_name, trust_tier, trust_score, is_verified)')
+        .select('id, lender_id, borrower_id, amount, interest_rate, status, type, created_at, description, due_date, overdue_policy, poster_profile:profiles!matching_requests_lender_id_fkey(full_name, tier, trust_score, is_id_verified)')
         .eq('status', 'pending')
         .is('borrower_id', null)
         .or(`due_date.gte.${todayStr},due_date.is.null`)

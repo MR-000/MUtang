@@ -8,7 +8,7 @@ export async function GET(req: Request) {
   try {
     const { data, error } = await supabase!
       .from('profiles')
-      .select('id, full_name, phone, email, trust_tier, trust_score, is_verified, verification_status, credit, gcash_number, gcash_qr_url, solana_wallet, id_number')
+      .select('id, full_name, phone, email, tier, trust_score, is_id_verified, verification_status, credit, gcash_number, gcash_qr_url, solana_wallet, id_number')
       .eq('id', user!.id)
       .single();
 
@@ -19,9 +19,9 @@ export async function GET(req: Request) {
         full_name: user!.email?.split('@')[0] || '',
         phone: null,
         email: user!.email,
-        trust_tier: 'Bronze',
+        tier: 'Bronze',
         trust_score: 0,
-        is_verified: false,
+        is_id_verified: false,
         verification_status: 'unverified',
         credit: 0,
         gcash_number: null,

@@ -1,19 +1,23 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { serviceClient } from '@/lib/supabase-service';
 import { convertTokenToCredit } from '@/lib/exchange';
 import crypto from 'crypto';
 
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const USDT_MINT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB";
 
-function verifyHeliusSignature(req: Request, body: string): boolean {
+function verifyHeliusSignature(req: Request, body: string): NextResponse | null {
   const signature = req.headers.get('x-webhook-signature');
   const webhookId = req.headers.get('x-webhook-id');
   const timestamp = req.headers.get('x-webhook-timestamp');
   const secret = process.env.HELIUS_WEBHOOK_SECRET;
 
-  if (!secret) return true;
-  if (!signature || !webhookId || !timestamp) return false;
+  if (!secret) {
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
+  }
+  if (!signature || !webhookId || !timestamp) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
   const payload = `${webhookId}.${timestamp}.${body}`;
   const expectedSignature = crypto
@@ -23,18 +27,23 @@ function verifyHeliusSignature(req: Request, body: string): boolean {
 
   const sigBuf = Buffer.from(signature);
   const expectedBuf = Buffer.from(expectedSignature);
-  if (sigBuf.length !== expectedBuf.length) return false;
-  return crypto.timingSafeEqual(sigBuf, expectedBuf);
+  if (sigBuf.length !== expectedBuf.length) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  return null;
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.text();
-    
-    if (!verifyHeliusSignature(req, body)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
+    const authError = verifyHeliusSignature(req, body);
+    if (authError) return authError;
+
+    const heliusSecret = process.env.HELIUS_WEBHOOK_SECRET;
     const transactions = JSON.parse(body);
 
     if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
@@ -42,9 +51,7 @@ export async function POST(req: Request) {
     }
 
     for (const tx of transactions) {
-      if (!tx.tokenTransfers || tx.tokenTransfers.length === 0) {
-        continue;
-      }
+      if (!tx.tokenTransfers || tx.tokenTransfers.length === 0) continue;
 
       for (const transfer of tx.tokenTransfers) {
         const mint = transfer.mint;
@@ -55,11 +62,9 @@ export async function POST(req: Request) {
           const fromWallet = transfer.fromUserAccount;
           const txId = tx.signature;
 
-          console.log(`[Solana Deposit Webhook] Received deposit: ${method}, Dollar Amount: ${dollarAmount}, From: ${fromWallet}, TxID: ${txId}`);
-
           const tokenType = mint === USDC_MINT ? 'usdc' : 'usdt';
 
-          const { data: matchedRequest, error: matchError } = await supabase
+          const { data: matchedRequest, error: matchError } = await serviceClient
             .from('deposit_requests')
             .select('id, amount')
             .eq('from_wallet', fromWallet)
@@ -74,29 +79,25 @@ export async function POST(req: Request) {
 
           if (matchError || !matchedRequest) {
             pAmountArgument = await convertTokenToCredit(dollarAmount, tokenType);
-            console.log(`[Solana Deposit Webhook] Direct transfer detected. Converted ${dollarAmount} ${tokenType.toUpperCase()} to ${pAmountArgument} Credits`);
-          } else {
-            console.log(`[Solana Deposit Webhook] 3-Min Fixed Price Request found! Will credit fixed ${matchedRequest.amount} Credits for dollar amount ${dollarAmount}`);
           }
 
-          const { data, error } = await supabase.rpc('complete_solana_deposit', {
+          const { data, error } = await serviceClient.rpc('complete_solana_deposit', {
             p_from_wallet: fromWallet,
             p_amount: pAmountArgument,
             p_tx_id: txId,
-            p_method: method
+            p_method: method,
+            p_secret: heliusSecret || null,
           });
 
           if (error) {
-            console.error(`[Solana Deposit Webhook] DB RPC error:`, error);
-          } else {
-            console.log(`[Solana Deposit Webhook] DB RPC result:`, data);
+            console.error(`[Solana Deposit Webhook] DB RPC error for tx ${txId}:`, error.message);
           }
         }
       }
     }
 
     return NextResponse.json({ message: "Webhook received successfully" }, { status: 200 });
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Solana Deposit Webhook] Webhook processing failed:', error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }

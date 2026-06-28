@@ -30,7 +30,8 @@ import {
   AlertTriangle,
   QrCode,
   Eye,
-  EyeOff
+  EyeOff,
+  XCircle
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { bffGet, bffPost } from '@/lib/bff-client';
@@ -76,9 +77,9 @@ interface MatchingRequest {
   overdue_policy?: string;
   poster_profile?: {
     full_name: string;
-    trust_tier: string;
+    tier: string;
     trust_score: number;
-    is_verified: boolean;
+    is_id_verified: boolean;
   };
 }
 
@@ -175,7 +176,15 @@ export default function Transactions() {
   const { user, profile, t, language } = useAuth();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [now, setNow] = useState(Date.now());
   const [activeTab, setActiveTab] = useState<'marketplace' | 'history'>('marketplace');
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
   const [feeRate, setFeeRate] = useState<number>(0.01);
   const [matchingType, setMatchingType] = useState<'borrower' | 'lender'>('borrower');
   const [searchQuery, setSearchQuery] = useState('');
@@ -1045,6 +1054,43 @@ export default function Transactions() {
     }
   };
 
+  const handleCancelLoan = async (loan: any) => {
+    if (!loan || isSubmitting) return;
+    if (!window.confirm('정말로 이 외상 거래를 취소하고 공고를 파기하시겠습니까?')) return;
+    setIsSubmitting(true);
+    try {
+      await bffPost('/api/bff/loans', {
+        action: 'update_status',
+        loan_id: loan.id,
+        status: 'canceled'
+      });
+      toast.success('외상 거래 계약이 취소 및 파기되었습니다.');
+      fetchLoans();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || t('error_occurred'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRequestTransfer = async (loan: any) => {
+    try {
+      const { error } = await supabase.from('notifications').insert({
+        user_id: loan.lender_id,
+        title: 'GCash 입금 요청 알림',
+        content: `${loan.borrower?.full_name || '채무자'}님이 외상 거래 성사에 따른 GCash 입금을 정중히 요청하셨습니다.`,
+        type: 'transfer_request',
+        link: `/debts?id=${loan.id}`
+      });
+      if (error) throw error;
+      toast.success('채권자에게 입금 요청 알림을 발송했습니다.');
+    } catch (err: any) {
+      console.error(err);
+      toast.error('알림 발송에 실패했습니다: ' + err.message);
+    }
+  };
+
   const fetchLoans = async () => {
     setLoading(true);
     try {
@@ -1400,7 +1446,7 @@ export default function Transactions() {
                       <div>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <h3 className="font-bold text-sm dark:text-white leading-tight">{req.poster_profile?.full_name}</h3>
-                          {req.poster_profile?.trust_tier && <TierBadge tier={req.poster_profile.trust_tier} />}
+                          {req.poster_profile?.tier && <TierBadge tier={req.poster_profile.tier} />}
                         </div>
                         <p className="text-[10px] text-slate-400 font-bold">
                           {t('post_date')}: {format(new Date(req.created_at), 'yyyy-MM-dd')}
@@ -1581,6 +1627,17 @@ export default function Transactions() {
                     const isWaitingReceipt = loan.status === 'waiting_receipt';
                     const isPdfDisabled = ['pending_signature', 'waiting_transfer', 'waiting_receipt'].includes(loan.status);
 
+                    // 10분 지연 거래 취소 타이머 계산
+                    const evidence = typeof loan.verification_evidence === 'string'
+                      ? JSON.parse(loan.verification_evidence)
+                      : loan.verification_evidence;
+                    const signedAt = evidence?.timestamp ? new Date(evidence.timestamp).getTime() : 0;
+                    const elapsedMs = signedAt ? now - signedAt : 0;
+                    const remainingMs = Math.max(0, (10 * 60 * 1000) - elapsedMs);
+                    const isCancelEnabled = remainingMs <= 0;
+                    const remainingMinutes = Math.floor(remainingMs / (60 * 1000));
+                    const remainingSeconds = Math.floor((remainingMs % (60 * 1000)) / 1000);
+
                     return (
                       <div className="mt-3.5 pt-2 border-t border-slate-100 dark:border-white/5 flex flex-col gap-2">
                         {/* 내가 서명해야 하는 대기 상태인 경우 */}
@@ -1613,8 +1670,18 @@ export default function Transactions() {
                               <span>{t('confirm_transfer_btn') || '송금 완료 확인'}</span>
                             </Button>
                           ) : (
-                            <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl text-[10px] font-bold text-center leading-normal animate-pulse">
-                              {t('waiting_lender_transfer') || '채권자의 송금을 기다리는 중입니다.'}
+                            <div className="space-y-2 w-full">
+                              <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl text-[10px] font-bold text-center leading-normal animate-pulse">
+                                {t('waiting_lender_transfer') || '채권자의 송금을 기다리는 중입니다.'}
+                              </div>
+                              <Button
+                                onClick={() => handleRequestTransfer(loan)}
+                                disabled={isSubmitting}
+                                className="w-full h-10 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                              >
+                                <Clock className="w-4 h-4" />
+                                <span>입금 요청 알림 발송</span>
+                              </Button>
                             </div>
                           )
                         )}
@@ -1635,6 +1702,22 @@ export default function Transactions() {
                               {t('waiting_borrower_receipt') || '채무자의 수령 확인을 기다리는 중입니다.'}
                             </div>
                           )
+                        )}
+
+                        {/* 10분 지연 거래 취소 버튼 (송금 대기 또는 수령 대기 시 표출) */}
+                        {(isWaitingTransfer || isWaitingReceipt) && (
+                          <Button
+                            onClick={() => handleCancelLoan(loan)}
+                            disabled={!isCancelEnabled || isSubmitting}
+                            className={`w-full h-11 rounded-xl font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 ${isCancelEnabled ? 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'}`}
+                          >
+                            <XCircle className="w-4 h-4" />
+                            <span>
+                              {isCancelEnabled
+                                ? '거래 계약 취소 및 파기'
+                                : `거래 취소 대기 (${remainingMinutes}분 ${remainingSeconds}초 후 가능)`}
+                            </span>
+                          </Button>
                         )}
 
                         {/* 하단 버튼 제어 */}
@@ -1691,7 +1774,7 @@ export default function Transactions() {
                           <span className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-widest block">
                             {t('lender')} {t('identity_verification')}
                           </span>
-                          {loan.status === 'pending_signature' && !isLender ? (
+                          {(loan.status === 'pending_signature' || loan.status === 'waiting_transfer' || loan.status === 'waiting_receipt') && !isLender ? (
                             <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-[10px] text-slate-400 font-bold italic text-center">
                               {t('evidence_hidden_before_success')}
                             </div>
@@ -1729,7 +1812,7 @@ export default function Transactions() {
                           <span className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-widest block">
                             {t('borrower')} {t('identity_verification')}
                           </span>
-                          {loan.status === 'pending_signature' && isLender ? (
+                          {(loan.status === 'pending_signature' || loan.status === 'waiting_transfer' || loan.status === 'waiting_receipt') && isLender ? (
                             <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-[10px] text-slate-400 font-bold italic text-center">
                               {t('evidence_hidden_before_success')}
                             </div>
@@ -1767,7 +1850,7 @@ export default function Transactions() {
                           <div className="text-center bg-white dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                             <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">LENDER SIGNATURE</span>
                             <div className="h-12 flex items-center justify-center">
-                              {loan.status === 'pending_signature' && !isLender ? (
+                              {(loan.status === 'pending_signature' || loan.status === 'waiting_transfer' || loan.status === 'waiting_receipt') && !isLender ? (
                                 <span className="text-[9px] text-slate-400 italic">비공개</span>
                               ) : sigData.lender ? (
                                 <img src={sigData.lender} alt="Lender Signature" className="max-h-10 object-contain" />
@@ -1779,7 +1862,7 @@ export default function Transactions() {
                           <div className="text-center bg-white dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
                             <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">BORROWER SIGNATURE</span>
                             <div className="h-12 flex items-center justify-center">
-                              {loan.status === 'pending_signature' && isLender ? (
+                              {(loan.status === 'pending_signature' || loan.status === 'waiting_transfer' || loan.status === 'waiting_receipt') && isLender ? (
                                 <span className="text-[9px] text-slate-400 italic">비공개</span>
                               ) : sigData.borrower ? (
                                 <img src={sigData.borrower} alt="Borrower Signature" className="max-h-10 object-contain" />

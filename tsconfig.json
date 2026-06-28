@@ -44,6 +44,7 @@
     "node_modules",
     "src_old",
     "vite.config.ts",
-    "supabase/functions"
+    "supabase/functions",
+    "pwa-client"
   ]
 }

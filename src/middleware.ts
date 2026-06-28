@@ -35,7 +35,9 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  if (pathname.startsWith('/api/auth/') && ratelimit) {
+  const isWebhook = pathname.startsWith('/api/webhooks/');
+
+  if (!isWebhook && pathname.startsWith('/api/auth/') && ratelimit) {
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
 
     const { success, limit, reset, remaining } = await ratelimit.limit(ip);
@@ -59,7 +61,9 @@ export async function middleware(request: NextRequest) {
     supabaseResponse.headers.set('X-RateLimit-Reset', reset.toString());
   }
 
-  await supabase.auth.getUser();
+  if (!isWebhook) {
+    await supabase.auth.getUser();
+  }
 
   return supabaseResponse;
 }

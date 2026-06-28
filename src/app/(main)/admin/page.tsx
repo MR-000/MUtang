@@ -47,8 +47,8 @@ interface UserProfile {
   full_name: string | null;
   phone: string | null;
   trust_score: number;
-  trust_tier: string;
-  is_verified: boolean;
+  tier: string;
+  is_id_verified: boolean;
   credit: number;
   updated_at: string;
 }
@@ -225,7 +225,7 @@ export default function AdminConsole() {
     setSelectedUser(user);
     setCreditAdjustment("");
     setTrustScoreAdjustment("");
-    setSelectedTier(user.trust_tier);
+    setSelectedTier(user.tier);
     setIsUserModalOpen(true);
   };
 
@@ -255,7 +255,7 @@ export default function AdminConsole() {
         user_id: selectedUser.id,
         credit: updatedCredit,
         trust_score: updatedTrustScore,
-        trust_tier: selectedTier,
+        tier: selectedTier,
       });
 
       if (creditAdjustment.trim()) {
@@ -283,8 +283,8 @@ export default function AdminConsole() {
 
   const handleToggleVerification = async (user: UserProfile) => {
     try {
-      const nextStatus = !user.is_verified;
-      await bffPost('/api/bff/admin', { action: 'verify_user', user_id: user.id, is_verified: nextStatus });
+      const nextStatus = !user.is_id_verified;
+      await bffPost('/api/bff/admin', { action: 'verify_user', user_id: user.id, is_id_verified: nextStatus });
 
       await bffPost('/api/bff/notifications', {
         user_id: user.id,
@@ -299,7 +299,7 @@ export default function AdminConsole() {
       
       // 모달 내부 상태 동기화
       if (selectedUser && selectedUser.id === user.id) {
-        setSelectedUser({ ...selectedUser, is_verified: nextStatus });
+        setSelectedUser({ ...selectedUser, is_id_verified: nextStatus });
       }
       fetchData();
     } catch (err: any) {
@@ -410,7 +410,7 @@ export default function AdminConsole() {
     return (
       (u.full_name || "").toLowerCase().includes(q) ||
       (u.phone || "").toLowerCase().includes(q) ||
-      (u.trust_tier || "").toLowerCase().includes(q)
+      (u.tier || "").toLowerCase().includes(q)
     );
   });
 
@@ -680,7 +680,7 @@ export default function AdminConsole() {
                                 <span className="whitespace-nowrap shrink-0">
                                   {u.full_name || "이름 미등록"}
                                 </span>
-                                {u.is_verified && (
+                                {u.is_id_verified && (
                                   <span className="text-[8px] bg-emerald-500/10 text-emerald-500 border border-emerald-500/10 px-1.5 py-0.5 rounded font-black shrink-0">
                                     인증
                                   </span>
@@ -688,7 +688,7 @@ export default function AdminConsole() {
                               </div>
                             </td>
                             <td className="py-3.5 px-3 whitespace-nowrap">
-                              <TierBadge tier={u.trust_tier || "Bronze"} />
+                              <TierBadge tier={u.tier || "Bronze"} />
                             </td>
                             <td className="py-3.5 px-3 text-slate-500 font-medium whitespace-nowrap">
                               {u.phone || "미등록"}
@@ -1102,10 +1102,10 @@ export default function AdminConsole() {
                   </div>
                   <Button
                     onClick={() => handleToggleVerification(selectedUser)}
-                    variant={selectedUser.is_verified ? "destructive" : "default"}
+                    variant={selectedUser.is_id_verified ? "destructive" : "default"}
                     className="h-10 px-4 rounded-xl text-xs font-black"
                   >
-                    {selectedUser.is_verified ? "인증 취소" : "인증 승인"}
+                    {selectedUser.is_id_verified ? "인증 취소" : "인증 승인"}
                   </Button>
                 </div>
 

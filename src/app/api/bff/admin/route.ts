@@ -27,7 +27,7 @@ export async function GET(req: Request) {
       case 'profiles': {
         const { data, error } = await supabase!
           .from('profiles')
-          .select('id, full_name, phone, email, trust_tier, trust_score, is_verified, credit, verification_status')
+          .select('id, full_name, phone, email, tier, trust_score, is_id_verified, credit, verification_status')
           .order('updated_at', { ascending: false });
 
         if (error) return errorResponse(error);
@@ -71,10 +71,11 @@ export async function GET(req: Request) {
           supabase!.from('profiles').select('credit'),
         ]);
 
-        const totalCredit = profiles?.reduce((sum, p) => {
+        const typedProfiles = (profiles ?? []) as { credit: number | null }[];
+        const totalCredit = typedProfiles.reduce((sum, p) => {
           const val = parseFloat(p.credit?.toString() || '0');
           return sum + (isNaN(val) ? 0 : val);
-        }, 0) || 0;
+        }, 0);
 
         return NextResponse.json({
           totalUsers: totalUsers ?? 0,
@@ -109,7 +110,7 @@ export async function POST(req: Request) {
         const updates: Record<string, any> = {};
         if (data.credit !== undefined) updates.credit = data.credit;
         if (data.trust_score !== undefined) updates.trust_score = data.trust_score;
-        if (data.trust_tier !== undefined) updates.trust_tier = data.trust_tier;
+        if (data.tier !== undefined) updates.tier = data.tier;
 
         const { error } = await supabase!
           .from('profiles')
@@ -123,7 +124,7 @@ export async function POST(req: Request) {
       case 'verify_user': {
         const { error } = await supabase!
           .from('profiles')
-          .update({ is_verified: data.is_verified })
+          .update({ is_id_verified: data.is_id_verified })
           .eq('id', data.user_id);
 
         if (error) return errorResponse(error);

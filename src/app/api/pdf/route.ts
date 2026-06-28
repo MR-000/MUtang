@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PDFDocument, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import path from 'path';
 
 // 폰트 바이너리 캐시
 let cachedFontBytes: ArrayBuffer | null = null;
@@ -179,15 +181,35 @@ export async function POST(req: NextRequest) {
         });
         const { data: loanData, error: loanError } = await supabase
           .from('loans')
-          .select('status, verification_evidence, signature_data')
+          .select('status, verification_evidence, signature_data, lender_id, borrower_id')
           .eq('id', id)
           .single();
 
         if (loanError) {
-          console.error('[PDF API] DB Load Error:', loanError);
+          console.error('[PDF API] DB Loan Load Error:', loanError);
         }
+        
+        let dbLenderGcash = '';
+        let dbBorrowerGcash = '';
+
         if (!loanError && loanData) {
           console.log('[PDF API] DB Load Success. status:', loanData.status);
+          
+          // profiles 테이블에서 대주/차주의 GCash 번호 가져오기
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, gcash_number')
+            .in('id', [loanData.lender_id, loanData.borrower_id]);
+          
+          if (profilesError) {
+            console.error('[PDF API] DB Profiles Load Error:', profilesError);
+          } else if (profilesData) {
+            const lenderProf = profilesData.find(p => p.id === loanData.lender_id);
+            const borrowerProf = profilesData.find(p => p.id === loanData.borrower_id);
+            dbLenderGcash = lenderProf?.gcash_number || '';
+            dbBorrowerGcash = borrowerProf?.gcash_number || '';
+          }
+
           if (['pending_signature', 'waiting_transfer', 'waiting_receipt'].includes(loanData.status)) {
             isPendingSignature = true;
           }
@@ -201,7 +223,6 @@ export async function POST(req: NextRequest) {
             }
             if (evidence.transferred_at && !transferredAt) {
               const formattedDate = new Date(evidence.transferred_at);
-              // Simple format helper equivalent to yyyy-MM-dd HH:mm
               transferredAt = formattedDate.toISOString().replace('T', ' ').substring(0, 16);
             }
             if (evidence.received_at && !receivedAt) {
@@ -219,6 +240,10 @@ export async function POST(req: NextRequest) {
             dbBorrowerSig = sigs?.borrower || borrowerSig;
           }
         }
+        
+        // 최종 주입용 변수로 정의
+        body.dbLenderGcash = dbLenderGcash;
+        body.dbBorrowerGcash = dbBorrowerGcash;
       } catch (dbErr) {
         console.error('[PDF API] DB fallback error:', dbErr);
       }
@@ -262,6 +287,30 @@ export async function POST(req: NextRequest) {
     const fontBytes = await getFontBytes();
     const font = await pdfDoc.embedFont(fontBytes);
 
+    // GCash 데이터 바인딩
+    const lenderGcash = body.dbLenderGcash || body.lenderGcash || '-';
+    const borrowerGcash = body.dbBorrowerGcash || body.borrowerGcash || '-';
+
+    // MUtang 로고 임베딩 (Vercel 및 로컬 호환)
+    let logoImg: any = null;
+    try {
+      const primaryPath = path.join(process.cwd(), 'DOC', 'android.png');
+      let logoBytes: Buffer | null = null;
+      if (fs.existsSync(primaryPath)) {
+        logoBytes = fs.readFileSync(primaryPath);
+      } else {
+        const secondaryPath = path.join(process.cwd(), 'public', 'pwa-512x512.png');
+        if (fs.existsSync(secondaryPath)) {
+          logoBytes = fs.readFileSync(secondaryPath);
+        }
+      }
+      if (logoBytes) {
+        logoImg = await pdfDoc.embedPng(logoBytes);
+      }
+    } catch (e) {
+      console.error('[PDF API] Logo load or embed error:', e);
+    }
+
     // 2. 공통 드로잉 스타일 도구
     const primaryColor = rgb(0.12, 0.23, 0.54); // #1e3a8a (Navy)
     const textColor = rgb(0.06, 0.09, 0.16); // #0f172a (Dark slate)
@@ -285,6 +334,9 @@ export async function POST(req: NextRequest) {
       // 상단 타이틀 영역
       page1.drawText(localTitle || '외상거래 계약서 및 원장 기록', { x: 40, y: 720, size: 18, font, color: primaryColor });
       page1.drawText(`Transaction ID: ${id}`, { x: 40, y: 700, size: 8, font, color: grayColor });
+      if (logoImg) {
+        page1.drawImage(logoImg, { x: 520, y: 705, width: 45, height: 45 });
+      }
       page1.drawLine({ start: { x: 40, y: 690 }, end: { x: 572, y: 690 }, thickness: 1.5, color: borderGray });
 
       // 당사자 인적 정보 박스 배경
@@ -292,10 +344,10 @@ export async function POST(req: NextRequest) {
       
       // 당사자 정보 텍스트
       page1.drawText(`${activeLabels.lender}:`, { x: 55, y: 650, size: 10, font, color: grayColor });
-      page1.drawText(`${lenderName || '-'} (${lenderPhone || '-'})`, { x: 170, y: 650, size: 10, font, color: textColor });
+      page1.drawText(`${lenderName || '-'} (GCash: ${lenderGcash})`, { x: 170, y: 650, size: 10, font, color: textColor });
       
       page1.drawText(`${activeLabels.borrower}:`, { x: 55, y: 630, size: 10, font, color: grayColor });
-      page1.drawText(`${borrowerName || '-'}`, { x: 170, y: 630, size: 10, font, color: textColor });
+      page1.drawText(`${borrowerName || '-'} (GCash: ${borrowerGcash})`, { x: 170, y: 630, size: 10, font, color: textColor });
       
       page1.drawText(`${activeLabels.date}:`, { x: 55, y: 610, size: 10, font, color: grayColor });
       page1.drawText(`${transactionDate || '-'}`, { x: 170, y: 610, size: 10, font, color: textColor });
@@ -375,6 +427,9 @@ export async function POST(req: NextRequest) {
     // 상단 타이틀 영역
     page2.drawText(enTitle || 'Credit Transaction Agreement', { x: 40, y: 720, size: 18, font, color: primaryColor });
     page2.drawText(`Transaction ID: ${id}`, { x: 40, y: 700, size: 8, font, color: grayColor });
+    if (logoImg) {
+      page2.drawImage(logoImg, { x: 520, y: 705, width: 45, height: 45 });
+    }
     page2.drawLine({ start: { x: 40, y: 690 }, end: { x: 572, y: 690 }, thickness: 1.5, color: borderGray });
 
     // 당사자 인적 정보 박스 배경
@@ -382,10 +437,10 @@ export async function POST(req: NextRequest) {
     
     // 당사자 정보 텍스트
     page2.drawText(`Lender:`, { x: 55, y: 650, size: 10, font, color: grayColor });
-    page2.drawText(`${lenderName || '-'} (${lenderPhone || '-'})`, { x: 170, y: 650, size: 10, font, color: textColor });
+    page2.drawText(`${lenderName || '-'} (GCash: ${lenderGcash})`, { x: 170, y: 650, size: 10, font, color: textColor });
     
     page2.drawText(`Borrower:`, { x: 55, y: 630, size: 10, font, color: grayColor });
-    page2.drawText(`${borrowerName || '-'}`, { x: 170, y: 630, size: 10, font, color: textColor });
+    page2.drawText(`${borrowerName || '-'} (GCash: ${borrowerGcash})`, { x: 170, y: 630, size: 10, font, color: textColor });
     
     page2.drawText(`Transaction Date:`, { x: 55, y: 610, size: 10, font, color: grayColor });
     page2.drawText(`${transactionDate || '-'}`, { x: 170, y: 610, size: 10, font, color: textColor });

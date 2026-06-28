@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n opencode,ocr,next -c yellow,cyan,green \"opencode serve --port 4096\" \"python ocr-server/main.py\" \"next dev\"",
-    "build": "next build",
+    "dev": "concurrently -n opencode,next,pwa -c yellow,green,cyan \"opencode serve --port 4096\" \"next dev\" \"npm run dev --prefix pwa-client\"",
+    "build": "next build && npm run build --prefix pwa-client && node post-build.js",
     "start": "next start",
     "lint": "next lint"
   },

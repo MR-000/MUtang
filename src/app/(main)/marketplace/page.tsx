@@ -51,7 +51,7 @@ export default function Marketplace() {
           store_type: store_type,
           amount: Number(req.amount),
           purpose: purpose,
-          tier: req.poster_profile?.trust_tier || 'Bronze',
+          tier: req.poster_profile?.tier || 'Bronze',
           repayment_rate: req.poster_profile?.trust_score ? `${req.poster_profile.trust_score}%` : '100%',
           created_at: req.created_at,
           raw: req

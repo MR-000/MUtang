@@ -81,7 +81,7 @@ export default function Dashboard() {
 
   const stats = [
     { label: t('active_records'), value: statsLoading ? '-' : String(activeLoans), icon: ShieldCheck, color: 'text-blue-500' },
-    { label: t('reputation'), value: <TierBadge tier={profile?.trust_tier || 'Bronze'} />, icon: TrendingUp, color: 'text-amber-500' },
+    { label: t('reputation'), value: <TierBadge tier={profile?.tier || 'Bronze'} />, icon: TrendingUp, color: 'text-amber-500' },
     { label: t('customers'), value: statsLoading ? '-' : String(customerCount), icon: Users, color: 'text-emerald-500' },
     { label: t('inventory'), value: statsLoading ? '-' : String(inventoryCount), icon: Package, color: 'text-indigo-500' },
   ];
@@ -96,7 +96,7 @@ export default function Dashboard() {
             <div className="flex flex-wrap items-center gap-1.5 mb-1">
               <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] font-bold uppercase tracking-wider">
                 <ShieldCheck className="w-2.5 h-2.5" />
-                {profile?.trust_tier || 'Bronze'} Tier
+                {profile?.tier || 'Bronze'} Tier
               </div>
               {profile?.is_admin && (
                 <Link href="/admin">
