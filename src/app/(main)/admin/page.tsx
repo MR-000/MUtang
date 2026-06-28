@@ -172,7 +172,8 @@ export default function AdminConsole() {
   const checkOcrHealth = async () => {
     setOcrHealth({ status: 'checking', message: '연결 확인 중...' });
     try {
-      const res = await fetch('http://localhost:8000/health', { signal: AbortSignal.timeout(5000) });
+      const ocrBaseUrl = process.env.NEXT_PUBLIC_OCR_URL || 'http://localhost:8000';
+      const res = await fetch(`${ocrBaseUrl}/health`, { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         const data = await res.json();
         setOcrHealth({ status: 'online', message: `${data.ocr} / ${data.structure} / ${data.face}` });

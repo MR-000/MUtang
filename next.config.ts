@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data: https://fonts.gstatic.com https://raw.githubusercontent.com",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.helius.xyz https://api.coingecko.com https://generativelanguage.googleapis.com https://raw.githubusercontent.com http://localhost:8000",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.helius.xyz https://api.coingecko.com https://generativelanguage.googleapis.com https://raw.githubusercontent.com http://localhost:8000 https://mutang.vercel.app",
               "frame-src 'self'",
               "media-src 'self' blob:",
               "worker-src 'self' blob:",
