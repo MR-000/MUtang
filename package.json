@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -n opencode,next,pwa -c yellow,green,cyan \"opencode serve --port 4096\" \"next dev\" \"npm run dev --prefix pwa-client\"",
-    "build": "next build && npm run build --prefix pwa-client && node post-build.js",
+    "build": "next build && npm install --prefix pwa-client && npm run build --prefix pwa-client && node post-build.js",
     "start": "next start",
     "lint": "next lint"
   },
