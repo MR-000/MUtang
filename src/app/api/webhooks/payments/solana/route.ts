@@ -50,6 +50,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "No data" }, { status: 200 });
     }
 
+    const adminEmail = process.env.ADMIN_EMAIL || 'tkdghksl0531@gmail.com';
+    const { data: adminProfile } = await serviceClient
+      .from('profiles')
+      .select('solana_wallet')
+      .eq('email', adminEmail)
+      .limit(1)
+      .maybeSingle();
+    const receiverWallet = adminProfile?.solana_wallet;
+
     for (const tx of transactions) {
       if (!tx.tokenTransfers || tx.tokenTransfers.length === 0) continue;
 
@@ -57,6 +66,12 @@ export async function POST(req: Request) {
         const mint = transfer.mint;
 
         if (mint === USDC_MINT || mint === USDT_MINT) {
+          const toWallet = transfer.toUserAccount;
+          if (receiverWallet && toWallet !== receiverWallet) {
+            console.warn(`[Solana Deposit Webhook] Receiver wallet mismatch. Got: ${toWallet}, Expected: ${receiverWallet}`);
+            continue;
+          }
+
           const method = mint === USDC_MINT ? "solana_usdc" : "solana_usdt";
           const dollarAmount = Number(transfer.amount);
           const fromWallet = transfer.fromUserAccount;
