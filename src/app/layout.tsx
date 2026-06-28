@@ -14,8 +14,8 @@ export const metadata: Metadata = {
     title: "MUtang",
   },
   icons: {
-    icon: "/icon-192.png",
-    shortcut: "/icon-192.png",
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
     apple: "/apple-touch-icon.png",
   },
 };
